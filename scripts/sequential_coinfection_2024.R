@@ -1,4 +1,4 @@
-#Updated to work with GitHub on 1/5/26
+#Updated to work with GitHub on 1/6/26
 #Load libraries
 library(tidyverse)
 library(car)
@@ -20,8 +20,8 @@ library(ggtext)
 library(scales)
 library(patchwork)
 
-#set whatever working directory you want 
-setwd("C:/Users/kiram/OneDrive/Desktop/Duffy Lab/Sequential conifection past vs metsch/Data")
+#set working directory to work within GitHub
+setwd("~/SequentialCoinfection/data")
 total.spores <- read.csv("Coinfection Total Spore Yield Data.csv")
 View(total.spores)
 

@@ -218,7 +218,7 @@ metsch$DayMetFactor <- as.factor(metsch$DayMetFactor)
 metsch$DayMetFactor <- factor(metsch$DayMetFactor,levels = c("never", "5", "10", "15", "30"))
 
 #third part of the facet plot
-#finding prevalence of past infection 
+#finding prevalence of metsch infection 
 metsch$MetschInfected_numeric <- ifelse(metsch$MetschInfected == "Yes", 1, 0)
 metsch <- na.omit(metsch)
 
@@ -277,7 +277,7 @@ f3 <- ggplot(prevalence_combined_metsch, aes(x = DayMetFactor, y = prevalence, c
       "coinfection" = "coinfection",
       "total" = "overall")) +
   ylab("Infection prevalence of *A. monospora*") +
-  xlab("Experimental treatments") +
+  xlab("Day of exposure to *A. monospora*") +
   theme_classic() +
   theme(
     axis.title.x = ggtext::element_markdown(),
@@ -326,7 +326,7 @@ infectionplot <- (f1 | f2) / (f3 | f4) &
     strip.text = element_text(size = 16)
   )
 infectionplot
-ggsave("~/SequentialCoinfection/figures/infectionplot.png", infectionplot, dpi = 600, width = 12, height = 9, units = "in")
+ggsave("~/SequentialCoinfection/figures/infectionplot.png", infectionplot, dpi = 600, width = 12, height = 9.5, units = "in")
 
 ####Veering off into a different direction 
 #Testing if the liklihood of an individual to be coinfected changed depending on when metsch was added in 

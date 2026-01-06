@@ -156,7 +156,7 @@ prevalence_combined$Coinfected <- factor(
 
 
 #Making this facet plot by stacked with coinfected vs singly infected 
-f1 <- ggplot(prevalence_combined, aes(x = DayMetFactor, y = prevalence, color = Coinfected)) +
+f1 <-ggplot(prevalence_combined, aes(x = DayMetFactor, y = prevalence, color = Coinfected)) +
   geom_point(size = 4, position = position_dodge(width = 0.4)) +
   geom_errorbar(aes(ymin = prevalence - se, ymax = prevalence + se), 
                 width = 0.1, position = position_dodge(width = 0.4)) +
@@ -165,9 +165,11 @@ f1 <- ggplot(prevalence_combined, aes(x = DayMetFactor, y = prevalence, color = 
       "single infection" = "cornflowerblue",
       "coinfection" = "#7f39d4",
       "total" = "black"
-    )
-  ) +
-  ylab("Infection Prevalence of *P. ramosa*") +
+    ), labels = c(
+      "single infection" = "single infection",
+      "coinfection" = "coinfection",
+      "total" = "overall")) +
+  ylab("Infection prevalence of *P. ramosa*") +
   xlab(NULL) +
   theme_classic() +
   theme(
@@ -189,7 +191,7 @@ f2 <- ggplot(past_spores, aes(x = Coinfected, y = Past.spore.in.animal, color = 
   theme_classic() +
   labs(
     x = NULL,
-    y = "Number of *P. ramosa* spores in animal",
+    y = "Number of *P. ramosa* spores per host",
     color = NULL
   ) +
   theme(
@@ -270,10 +272,12 @@ f3 <- ggplot(prevalence_combined_metsch, aes(x = DayMetFactor, y = prevalence, c
       "single infection" = "tomato",
       "coinfection" = "#7f39d4",
       "total" = "black"
-    )
-  ) +
-  ylab("Infection Prevalence of *A. monospora*") +
-  xlab(NULL) +
+    ), labels = c(
+      "single infection" = "single infection",
+      "coinfection" = "coinfection",
+      "total" = "overall")) +
+  ylab("Infection prevalence of *A. monospora*") +
+  xlab("Experimental treatments") +
   theme_classic() +
   theme(
     axis.title.x = ggtext::element_markdown(),
@@ -293,8 +297,8 @@ f4 <- ggplot(metsch_spores, aes(x = Coinfected, y = Metsch.spore.in.animal, colo
   geom_jitter(width = 0.3, size = 3, alpha = 1, show.legend = TRUE, shape = 17) +
   theme_classic() +
   labs(
-    x = NULL,
-    y = "Number of *A. monospora* spores in animal",
+    x = "Infection status",
+    y = "Number of *A. monospora* spores per host",
     color = NULL
   ) +
   theme(
@@ -312,9 +316,17 @@ f4 <- ggplot(metsch_spores, aes(x = Coinfected, y = Metsch.spore.in.animal, colo
   scale_x_discrete(labels = c("No" = "single infection", "Yes" = "coinfection")) +
   scale_y_continuous(limits = c(0, NA), labels = scales::comma)
 
-infectionplot <- (f1 | f2) / (f3 | f4)
+infectionplot <- (f1 | f2) / (f3 | f4) &
+  theme(
+    text = element_text(size = 16),
+    axis.title = element_text(size = 16),
+    axis.text = element_text(size = 14),
+    legend.text = ggtext::element_markdown(size = 14),
+    legend.title = ggtext::element_markdown(size = 16),
+    strip.text = element_text(size = 16)
+  )
 infectionplot
-ggsave("infectionplot.png", infectionplot, dpi = 600, width = 10, height = 9, units = "in")
+ggsave("~/SequentialCoinfection/figures/infectionplot.png", infectionplot, dpi = 600, width = 12, height = 9, units = "in")
 
 ####Veering off into a different direction 
 #Testing if the liklihood of an individual to be coinfected changed depending on when metsch was added in 

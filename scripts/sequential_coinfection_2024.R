@@ -19,6 +19,7 @@ library(here)
 library(ggtext)
 library(scales)
 library(patchwork)
+library(dplyr)
 
 #set working directory to work within GitHub
 setwd("~/SequentialCoinfection/data")
@@ -180,52 +181,93 @@ f1 <-ggplot(prevalence_combined, aes(x = DayMetFactor, y = prevalence, color = C
     legend.justification = c("left", "top"),
     legend.background = element_rect(fill = "white", color = "black", linewidth = 0.3)
   ) + labs(color = NULL) +
-  coord_cartesian(ylim = c(0, 0.8))
+  coord_cartesian(ylim = c(0, 1))
 
 # Spore count summary
 past_spores <- subset(past, PastInfected == "Yes")
 
-f2 <- ggplot(past_spores, aes(x = Coinfected, y = Past.spore.in.animal, color = DayMetFactor)) +
-  geom_violin(color = "black", fill = NA, trim = FALSE) +
-  geom_jitter(width = 0.3, size = 3, alpha = 1, show.legend = TRUE) +
+#Creating a dataset that averages spores by treatment 
+past_spores_summary <- past_spores %>%
+  group_by(DayMetFactor, Coinfected) %>%
+  summarise(
+    n = n(),
+    mean_spores = mean(Past.spore.in.animal, na.rm = TRUE),
+    se_spores = sd(Past.spore.in.animal, na.rm = TRUE) / sqrt(n),
+    .groups = "drop"
+  )
+
+# Optional: make Coinfected labels more readable
+past_spores_summary$Coinfected <- factor(
+  past_spores_summary$Coinfected,
+  levels = c("No", "Yes"),
+  labels = c("single infection", "coinfection"))
+
+#Past spores plotted 
+f2 <-ggplot(past_spores_summary, aes(x = DayMetFactor, y = mean_spores, color = Coinfected)) +
+  geom_point(size = 4, position = position_dodge(width = 0.4)) +
+  geom_errorbar(aes(ymin = mean_spores - se_spores, ymax = mean_spores + se_spores), 
+                width = 0.1, position = position_dodge(width = 0.4)) +
+  scale_color_manual(
+    values = c(
+      "single infection" = "cornflowerblue",
+      "coinfection" = "#7f39d4"), labels = c(
+      "single infection" = "single infection",
+      "coinfection" = "coinfection")) +
+  ylab("Mean spores per host *P. ramosa*") +
+  xlab(NULL) +
   theme_classic() +
-  labs(
-    x = NULL,
-    y = "Number of *P. ramosa* spores per host",
-    color = NULL
-  ) +
   theme(
-    axis.title.x = ggtext::element_markdown(), 
+    axis.title.x = ggtext::element_markdown(),
     axis.title.y = ggtext::element_markdown(),
-    legend.text = ggtext::element_markdown(), 
-    legend.title = ggtext::element_markdown(),
+    legend.text = ggtext::element_markdown(),
     legend.position = c(.01, 1),
     legend.justification = c("left", "top"),
     legend.background = element_rect(fill = "white", color = "black", linewidth = 0.3)
-  ) +
-  scale_color_manual(
-    values = c("never" = "grey50", "5" = "#c1b0d6", "10" = "#ac8cd4", "15" = "#7f39d4", "30" = "#640ecc")
-  ) +
-  scale_x_discrete(labels = c("No" = "single infection", "Yes" = "coinfection")) +
-  scale_y_continuous(limits = c(0, NA), labels = scales::comma)
+  ) + labs(color = NULL) + scale_x_discrete(drop = FALSE) + scale_y_continuous(labels = scales::label_comma())
+
+
+#The same data as above,but in a violin plot 
+#ggplot(past_spores, aes(x = Coinfected, y = Past.spore.in.animal, color = DayMetFactor, shape = MetschExposed)) +
+#  geom_violin(color = "black", fill = NA, trim = FALSE) +
+#  geom_jitter(width = 0.3, size = 3, alpha = 1, show.legend = TRUE) +
+#  theme_classic() +
+#  labs(
+#    x = NULL,
+#    y = "Number of *P. ramosa* spores per host",
+#    color = NULL
+#  ) +
+#  theme(
+#    axis.title.x = ggtext::element_markdown(), 
+#    axis.title.y = ggtext::element_markdown(),
+#    legend.text = ggtext::element_markdown(), 
+#    legend.title = ggtext::element_markdown(),
+#    legend.position = c(.01, 1),
+#    legend.justification = c("left", "top"),
+#    legend.background = element_rect(fill = "white", color = "black", linewidth = 0.3)
+#  ) +
+#  scale_color_manual(
+#    values = c("never" = "grey50", "5" = "#c1b0d6", "10" = "#ac8cd4", "15" = "#7f39d4", "30" = "#640ecc")
+#  ) +
+#  scale_x_discrete(labels = c("No" = "single infection", "Yes" = "coinfection")) +
+#  scale_y_continuous(limits = c(0, NA), labels = scales::comma)
 
 #Same thing as the two plots above, but for metsch 
 #finding prevalence of metsch infection 
-metsch <- subset(spores.factor, TreatmentGroup %in% c("T2", "T3", "T4", "T5", "T6"))
-metsch$DayMetFactor <- as.character(metsch$DayMetFactor)
-metsch$DayMetFactor[metsch$DayMetFactor == "0"] <- "never"
-metsch$DayMetFactor <- as.factor(metsch$DayMetFactor)
-metsch$DayMetFactor <- factor(metsch$DayMetFactor,levels = c("never", "5", "10", "15", "30"))
+metsch_with_singlyexposed <- subset(spores.factor, TreatmentGroup %in% c("T2", "T3", "T4", "T5", "T6", "T7", "T8", "T9", "T10"))
+metsch_with_singlyexposed$DayMetFactor <- as.character(metsch_with_singlyexposed$DayMetFactor)
+metsch_with_singlyexposed$DayMetFactor[metsch_with_singlyexposed$DayMetFactor == "0"] <- "never"
+metsch_with_singlyexposed$DayMetFactor <- as.factor(metsch_with_singlyexposed$DayMetFactor)
+metsch_with_singlyexposed$DayMetFactor <- factor(metsch_with_singlyexposed$DayMetFactor,levels = c("never", "5", "10", "15", "30"))
 
 #third part of the facet plot
 #finding prevalence of metsch infection 
-metsch$MetschInfected_numeric <- ifelse(metsch$MetschInfected == "Yes", 1, 0)
-metsch <- na.omit(metsch)
+metsch_with_singlyexposed$MetschInfected_numeric <- ifelse(metsch_with_singlyexposed$MetschInfected == "Yes", 1, 0)
+metsch_with_singlyexposed <- na.omit(metsch_with_singlyexposed)
 
 # Step 1: Create the base prevalence data
-prevalence_by_coinfection_metsch <- metsch %>%
+prevalence_by_coinfection_metsch_with_singlyexposed <- metsch_with_singlyexposed %>%
   filter(MetschInfected_numeric == 1) %>%
-  group_by(DayMetFactor, Coinfected) %>%
+  group_by(DayMetFactor, Coinfected, PastExpStatus) %>%
   summarise(
     infected_n = n(),
     .groups = "drop"
@@ -242,29 +284,37 @@ prevalence_by_coinfection_metsch <- metsch %>%
   )
 
 # Step 2: Add a "sum" row per DayMetFactor
-prevalence_metsch_sum <- prevalence_by_coinfection_metsch %>%
+prevalence_metsch_sum_with_singly_exposed <-
+  prevalence_by_coinfection_metsch_with_singlyexposed %>%
+  filter(PastExpStatus %in% c("ExposedUninfected", "Infected")) %>%
   group_by(DayMetFactor) %>%
   summarise(
     infected_n = sum(infected_n),
-    total_n = first(total_n),  # same total for both groups
+    total_n = first(total_n),
     prevalence = infected_n / total_n,
     se = sqrt(prevalence * (1 - prevalence) / total_n),
-    Coinfected = "Sum",  # New level
+    Coinfected = "Sum",
+    PastExpStatus = "Summed",
     .groups = "drop"
   )
 
 # Step 3: Combine original and sum data
-prevalence_combined_metsch <- bind_rows(prevalence_by_coinfection_metsch, prevalence_metsch_sum)
+prevalence_combined_metsch_with_singly_exposed <- bind_rows(prevalence_by_coinfection_metsch_with_singlyexposed, prevalence_metsch_sum_with_singly_exposed)
 
 # Optional: make Coinfected labels more readable
-prevalence_combined_metsch$Coinfected <- factor(
-  prevalence_combined_metsch$Coinfected,
+prevalence_combined_metsch_with_singly_exposed$Coinfected <- factor(
+  prevalence_combined_metsch_with_singly_exposed$Coinfected,
   levels = c("No", "Yes", "Sum"),
   labels = c("single infection", "coinfection", "total"))
 
-#Making this facet plot by stacked with coinfected vs singly infected 
-f3 <- ggplot(prevalence_combined_metsch, aes(x = DayMetFactor, y = prevalence, color = Coinfected)) +
-  geom_point(size = 4, position = position_dodge(width = 0.4), shape = 17) +
+prevalence_combined_metsch_with_singly_exposed$PastExpStatus <- factor(
+  prevalence_combined_metsch_with_singly_exposed$PastExpStatus,
+  levels = c("ExposedUninfected", "Unexposed", "Infected", "Summed"),
+  labels = c("Exposed but uninfected", "Unexposed", "Infected", "Total (only coexposed treatments)"))
+
+#Third plot for the facet plot
+f3<-ggplot(prevalence_combined_metsch_with_singly_exposed, aes(x = DayMetFactor, y = prevalence, color = Coinfected, shape = PastExpStatus)) +
+  geom_point(size = 4, position = position_dodge(width = 0.4)) +
   geom_errorbar(aes(ymin = prevalence - se, ymax = prevalence + se), 
                 width = 0.1, position = position_dodge(width = 0.4)) +
   scale_color_manual(
@@ -283,38 +333,91 @@ f3 <- ggplot(prevalence_combined_metsch, aes(x = DayMetFactor, y = prevalence, c
     axis.title.x = ggtext::element_markdown(),
     axis.title.y = ggtext::element_markdown(),
     legend.text = ggtext::element_markdown(),
-    legend.position = c(.01, 1),
-    legend.justification = c("left", "top"),
-    legend.background = element_rect(fill = "white", color = "black", linewidth = 0.3)
-  ) + labs(color = NULL) +
-  coord_cartesian(ylim = c(0, 0.8)) + scale_x_discrete(drop = FALSE)
-
-#fourth part of the facet plot
-metsch_spores <- subset(metsch, MetschInfected == "Yes")
-
-f4 <- ggplot(metsch_spores, aes(x = Coinfected, y = Metsch.spore.in.animal, color = DayMetFactor)) +
-  geom_violin(color = "black", fill = NA, trim = FALSE) +
-  geom_jitter(width = 0.3, size = 3, alpha = 1, show.legend = TRUE, shape = 17) +
-  theme_classic() +
-  labs(
-    x = "Infection status",
-    y = "Number of *A. monospora* spores per host",
-    color = NULL
-  ) +
-  theme(
-    axis.title.x = ggtext::element_markdown(), 
-    axis.title.y = ggtext::element_markdown(),
-    legend.text = ggtext::element_markdown(), 
     legend.title = ggtext::element_markdown(),
     legend.position = c(.01, 1),
     legend.justification = c("left", "top"),
     legend.background = element_rect(fill = "white", color = "black", linewidth = 0.3)
-  ) +
+  ) + labs(color = NULL) +
+  coord_cartesian(ylim = c(0, 1)) + scale_x_discrete(drop = FALSE) + labs(shape = "Exposed to *P. ramosa*") + scale_shape_manual(
+    values = c("Exposed but uninfected" = 16, "Unexposed" = 15, "Infected" = 17, "Total (only coexposed treatments)" = 18))
+
+#fourth part of the facet plot
+# Spore count summary
+metsch_spores <- subset(metsch_with_singlyexposed, MetschInfected == "Yes")
+
+#Creating a dataset that averages spores by treatment 
+metsch_spores_summary <- metsch_spores %>%
+  group_by(DayMetFactor, Coinfected, PastExpStatus) %>%
+  summarise(
+    n = n(),
+    mean_spores = mean(Metsch.spore.in.animal, na.rm = TRUE),
+    se_spores = sd(Metsch.spore.in.animal, na.rm = TRUE) / sqrt(n),
+    .groups = "drop"
+  )
+
+# Optional: make Coinfected labels more readable
+metsch_spores_summary$Coinfected <- factor(
+  metsch_spores_summary$Coinfected,
+  levels = c("No", "Yes"),
+  labels = c("single infection", "coinfection"))
+
+#Past spores plotted 
+f4<-ggplot(metsch_spores_summary, aes(x = DayMetFactor, y = mean_spores, color = Coinfected, shape = PastExpStatus)) +
+  geom_point(size = 4, position = position_dodge(width = 0.4)) +
+  geom_errorbar(aes(ymin = mean_spores - se_spores, ymax = mean_spores + se_spores), 
+                width = 0.1, position = position_dodge(width = 0.4)) +
   scale_color_manual(
-    values = c("never" = "grey50", "5" = "#c1b0d6", "10" = "#ac8cd4", "15" = "#7f39d4", "30" = "#640ecc")
-  ) +
-  scale_x_discrete(labels = c("No" = "single infection", "Yes" = "coinfection")) +
-  scale_y_continuous(limits = c(0, NA), labels = scales::comma)
+    values = c(
+      "single infection" = "tomato",
+      "coinfection" = "#7f39d4"), labels = c(
+        "single infection" = "single infection",
+        "coinfection" = "coinfection")) +
+  ylab("Mean spores per host *A. monospora*") +
+  xlab("Day of exposure to *A. monospora*") +
+  theme_classic() +
+  theme(
+    axis.title.x = ggtext::element_markdown(),
+    axis.title.y = ggtext::element_markdown(),
+    legend.text = ggtext::element_markdown(),
+    legend.title = ggtext::element_markdown(),
+    legend.position = c(.01, 1),
+    legend.justification = c("left", "top"),
+    legend.background = element_rect(fill = "white", color = "black", linewidth = 0.3)
+  ) + labs(color = NULL) + scale_x_discrete(drop = FALSE) + scale_y_continuous(labels = scales::label_comma()) + labs(shape = "Exposed to *P. ramosa*") +
+  scale_shape_manual(
+    values = c(
+      "ExposedUninfected" = 16, "Unexposed" = 15, "Infected" = 17),
+    labels = c(
+      "ExposedUninfected" = "Exposed but uninfected",
+      "Unexposed" = "Unexposed",
+      "Infected" = "Infected")) + guides(
+        shape = guide_legend(order = 1),
+        color = guide_legend(order = 2))
+
+#same data as above, but in a violin plot 
+#ggplot(metsch_spores, aes(x = Coinfected, y = Metsch.spore.in.animal, color = DayMetFactor)) +
+#  geom_violin(color = "black", fill = NA, trim = FALSE) +
+#  geom_jitter(width = 0.3, size = 3, alpha = 1, show.legend = TRUE, shape = 17) +
+#  theme_classic() +
+#  labs(
+#    x = "Infection status",
+#    y = "Number of *A. monospora* spores per host",
+#    color = NULL
+#  ) +
+#  theme(
+#    axis.title.x = ggtext::element_markdown(), 
+#    axis.title.y = ggtext::element_markdown(),
+#    legend.text = ggtext::element_markdown(), 
+#    legend.title = ggtext::element_markdown(),
+#    legend.position = c(.01, 1),
+#    legend.justification = c("left", "top"),
+#    legend.background = element_rect(fill = "white", color = "black", linewidth = 0.3)
+#  ) +
+#  scale_color_manual(
+#    values = c("never" = "grey50", "5" = "#c1b0d6", "10" = "#ac8cd4", "15" = "#7f39d4", "30" = "#640ecc")
+#  ) +
+#  scale_x_discrete(labels = c("No" = "single infection", "Yes" = "coinfection")) +
+#  scale_y_continuous(limits = c(0, NA), labels = scales::comma)
 
 infectionplot <- (f1 | f2) / (f3 | f4) &
   theme(
@@ -326,7 +429,7 @@ infectionplot <- (f1 | f2) / (f3 | f4) &
     strip.text = element_text(size = 16)
   )
 infectionplot
-ggsave("~/SequentialCoinfection/figures/infectionplot.png", infectionplot, dpi = 600, width = 12, height = 9.5, units = "in")
+ggsave("~/SequentialCoinfection/figures/infectionplot_withexposurelabels.png", infectionplot, dpi = 600, width = 12, height = 9.5, units = "in")
 
 ####Veering off into a different direction 
 #Testing if the liklihood of an individual to be coinfected changed depending on when metsch was added in 
@@ -519,7 +622,7 @@ levels(metschprop_pastexposed$MetschInfected)[levels(metschprop_pastexposed$Mets
 levels(metschprop_pastexposed$MetschInfected)[levels(metschprop_pastexposed$MetschInfected) == "No"] <- "0"
 
 #Metch infection prevalence, there are some influential outliers but they are all legit so they are kept in 
-metschprop_pastexposed.glm2 <- glm(MetschInfected ~ PastExposed*DayMetFactor, family = binomial, data = metschprop_pastexposed)
+metschprop_pastexposed.glm2 <- glm(MetschInfected ~ PastExposed+DayMetFactor, family = binomial, data = metschprop_pastexposed)
 summary(metschprop_pastexposed.glm2)
 plot(metschprop_pastexposed.glm2)
 

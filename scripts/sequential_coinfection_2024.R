@@ -101,6 +101,7 @@ spores.factor <- subset(total.spores, select = c("Metsch.spore.in.animal", "Past
 #Spore dataset with DayMet as numeric
 spores.numeric <- subset(total.spores, select = c("Metsch.spore.in.animal", "Past.spore.in.animal", "PastInfected", "PastExposed", "PastExpStatus", "MetschInfected", "MetschExposed", "MetExpStatus", "Coinfected", "TreatmentGroup", "Rep", "DayMetNum"))
 
+####Creating figure 2#####
 
 #facet plot of infection prevalence and spores 
 past <- subset(spores.factor, TreatmentGroup %in% c("T2", "T3", "T4", "T5", "T6"))
@@ -421,16 +422,149 @@ f4<-ggplot(metsch_spores_summary, aes(x = DayMetFactor, y = mean_spores, color =
 
 infectionplot <- (f1 | f2) / (f3 | f4) &
   theme(
-    text = element_text(size = 16),
-    axis.title = element_text(size = 16),
-    axis.text = element_text(size = 14),
+    text = element_text(size = 18),
+    axis.title = element_text(size = 18),
+    axis.text = element_text(size = 16),
     legend.text = ggtext::element_markdown(size = 14),
-    legend.title = ggtext::element_markdown(size = 16),
-    strip.text = element_text(size = 16)
+    legend.title = ggtext::element_markdown(size = 14),
+    strip.text = element_text(size = 18)
   )
 infectionplot
-ggsave("~/SequentialCoinfection/figures/infectionplot_withexposurelabels.png", infectionplot, dpi = 600, width = 18.25, height = 11, units = "in")
+ggsave("~/SequentialCoinfection/figures/infectionplot_withexposurelabels.png", infectionplot, dpi = 600, width = 18.5, height = 11, units = "in")
 
+
+###Creating figure 3####
+#FECUNDITY ANALYSIS
+egg <- read.csv("Coinfection Egg Data.csv")
+View(egg)
+
+#Add column that totals lifetime reproductive output for each individual
+egg$LifeRep <- rowSums(egg[ ,c(5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35, 37, 39, 41, 43, 45, 47, 49)], na.rm = TRUE)
+
+#Split the treatment group and rep, code lifetime reproductive output as an integer
+egg[c('TreatmentGroup', 'Rep')] <- str_split_fixed(egg$sample.ID, '-', 2)
+
+#Recode variables
+egg$TreatmentGroup <- as.factor(egg$TreatmentGroup)
+egg$LifeRep <- as.integer(egg$LifeRep)
+
+#Add in exposure and infection status columns and daymet columns from total.spores dataset
+total.egg <- cbind(egg, total.spores[c("PastExposed", "MetschExposed", "PastInfected", "MetschInfected", "PastExpStatus", "MetExpStatus", "DayMetNum", "DayMetFactor")])
+
+#Data Set Up: manipulate the egg data to show survival times
+
+#Here, I added in the dates that animals were exposed to Metsch and Past, and calculated the length of
+#survival post exposure to each parasite. If an animal did not survive 10 days after being exposed to 
+#Past, it was removed from the model analysis. If an animal did not survive 5 days after being exposed
+#to Metsch, it was removed from the model analysis. This is because premature death makes 
+#it hard/impossible to know if an animal was infected with anything or survived past the window
+#of infection and was not infected. Only 5 animals were removed and all were uninfected according 
+#to spore count data. Start date of the experiment was chosen as 10/14/2022, which was the day 
+#before Past exposures when all animals were still living (this can be changed if necessary, 
+#but it wasn't used the in the mortality analysis).
+
+#Subset the data
+egg.life <- subset(total.egg, select=c("TreatmentGroup", "Rep", "PastExposed", "MetschExposed", "PastInfected", "MetschInfected", "PastExpStatus", "MetExpStatus", "DayMetNum", "DayMetFactor", "LifeRep", "death.date"))
+
+#Add in a censor column for the survival analysis, where 1 means censored and 2 means dead
+egg.life <- egg.life %>% 
+  mutate(censor = ifelse(death.date == "", 1, 2))
+
+#Add in the censor date for animals that did not die before the last day of the experiment
+egg.life$death.date[egg.life$death.date == ""] <- "12/19/2022"
+
+#Convert death date to a date in r
+egg.life <- egg.life %>%
+  mutate(death.date = as.Date(death.date, format = "%m/%d/%Y"))
+str(egg.life)
+
+#Add a column with experiment start date, which I set as the day before past exposure for now
+egg.life <- egg.life %>%
+  mutate(egg.life, start.date = "10/14/2022")
+str(egg.life)
+
+#Convert experiment start date to a date in r
+egg.life <- egg.life %>%
+  mutate(start.date = as.Date(start.date, format = "%m/%d/%Y"))
+
+#Add a column with length of survival time in days from start of experiment
+egg.life <- egg.life %>%
+  mutate(lifesurvival = as.duration(start.date %--% death.date) / ddays(1))
+
+#Subset the data to just treatments 3-6 for now
+#egg.life.3to6 <- subset(egg.life, PastExposed == "Yes" & DayMetNum != "0" & DayMetFactor != "0" & PastInfected != "NA")
+
+#Add in Past exposure date column
+egg.life <- egg.life %>%
+  mutate(PastExposureDate = "10/15/2022")
+str(egg.life)
+
+#Make past exposure date a date in r
+egg.life <- egg.life %>%
+  mutate(PastExposureDate = as.Date(PastExposureDate, format = "%m/%d/%Y"))
+
+#Add in Metsch exposure date columns
+egg.life <- egg.life %>%
+  mutate(MetschExposureDate = ifelse(DayMetNum == "5", "10/20/2022", 
+                                     ifelse(DayMetNum == "10", "10/25/2022",
+                                            ifelse(DayMetNum == "15", "10/30/2022", "11/14/2022"))))
+
+#Make metsch exposure dates into dates in r
+egg.life <- egg.life %>%
+  mutate(MetschExposureDate = as.Date(MetschExposureDate, format = "%m/%d/%Y"))
+str(egg.life)
+
+#Add in days of survival after exposure to past column
+egg.life <- egg.life %>%
+  mutate(PostPastSurvival = as.duration(PastExposureDate %--% death.date) / ddays(1))
+
+#Add in days of survival after exposure to metsch column
+egg.life <- egg.life %>%
+  mutate(PostMetSurvival = as.duration(MetschExposureDate %--% death.date) / ddays(1))
+
+#Subset the data to only include animals that made it a certain number of days past exposure to Past and Metsch (e stands for egg, l stands for life in the dataframe name)
+el.final <- subset(egg.life, lifesurvival > 10)
+
+#Add a factor column that has infection status as either None, Past, Metsch, or Coinf. This will be useful for graphing and model analysis.
+el.final <- el.final %>%
+  mutate(InfStatusFactor = ifelse(PastInfected == "Yes" & MetschInfected == "Yes", "Coinf",
+                                  ifelse(PastInfected == "Yes", "Past", 
+                                         ifelse(MetschInfected == "Yes", "Metsch", "Uninf"))))
+el.final$InfStatusFactor <- as.factor(el.final$InfStatusFactor)
+el.final$InfStatusFactor <- factor(el.final$InfStatusFactor, c("Uninf", "Past", "Metsch", "Coinf"))
+
+el.final$DayMetFactor <- factor(el.final$DayMetFactor)
+el.final$DayMetFactor <- relevel(el.final$DayMetFactor, "0")
+
+el.final.nouninf <- el.final %>%
+  filter(InfStatusFactor != "Uninf")
+
+
+totalegg.glm <- glmmTMB(LifeRep ~ DayMetFactor * InfStatusFactor * lifesurvival, family = nbinom1(), data = el.final.nouninf)
+summary(totalegg.glm)
+
+testDispersion(totalegg.glm)
+testZeroInflation(totalegg.glm)
+
+totalegg.glm_simResid <- simulateResiduals(fittedModel = totalegg.glm)
+plot(totalegg.glm_simResid)
+
+#I don't really understand emmeans but here goes nothing 
+emm_egg <- emmeans(totalegg.glm, ~ DayMetFactor * InfStatusFactor * lifesurvival) 
+summary(emm_egg)
+totalegg.glm.df <- emmeans(totalegg.glm, specs = pairwise ~ InfStatusFactor | DayMetFactor | lifesurvival, type = "response")
+totalegg.glm.df
+coinfmetspores.emm.df <- as.data.frame(coinfmetspores.glm.df$emmeans)
+
+plot(emm_egg)
+
+#Extract the means for Egg Production Based on Infection Status and Day of Metsch Exposure Numeric
+egg.means.3to6.DMnum <- el.3to6.final %>%
+  group_by(DayMetNum, InfStatusFactor) %>%
+  summarize(N  = length(LifeRep),
+            LifeRep.mean = mean(LifeRep, na.rm = T),
+            LifeRep.sd = sd(LifeRep, na.rm = T),
+            LifeRep.se = LifeRep.sd / sqrt(N))
 ####Veering off into a different direction 
 #Testing if the liklihood of an individual to be coinfected changed depending on when metsch was added in 
 onlycoinfectiontreatments <- subset(spores.factor, TreatmentGroup %in% c("T3", "T4", "T5", "T6"))
@@ -739,138 +873,6 @@ testZeroInflation(justmet_spores.glm)
 
 justmet_spores.glm_simResid <- simulateResiduals(fittedModel = justmet_spores.glm)
 plot(justmet_spores.glm_simResid)
-
-#FECUNDITY ANALYSIS
-egg <- read.csv("Coinfection Egg Data.csv")
-View(egg)
-
-#Add column that totals lifetime reproductive output for each individual
-egg$LifeRep <- rowSums(egg[ ,c(5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35, 37, 39, 41, 43, 45, 47, 49)], na.rm = TRUE)
-
-#Split the treatment group and rep, code lifetime reproductive output as an integer
-egg[c('TreatmentGroup', 'Rep')] <- str_split_fixed(egg$sample.ID, '-', 2)
-
-#Recode variables
-egg$TreatmentGroup <- as.factor(egg$TreatmentGroup)
-egg$LifeRep <- as.integer(egg$LifeRep)
-
-#Add in exposure and infection status columns and daymet columns from total.spores dataset
-total.egg <- cbind(egg, total.spores[c("PastExposed", "MetschExposed", "PastInfected", "MetschInfected", "PastExpStatus", "MetExpStatus", "DayMetNum", "DayMetFactor")])
-
-#Data Set Up: manipulate the egg data to show survival times
-
-#Here, I added in the dates that animals were exposed to Metsch and Past, and calculated the length of
-#survival post exposure to each parasite. If an animal did not survive 10 days after being exposed to 
-#Past, it was removed from the model analysis. If an animal did not survive 5 days after being exposed
-#to Metsch, it was removed from the model analysis. This is because premature death makes 
-#it hard/impossible to know if an animal was infected with anything or survived past the window
-#of infection and was not infected. Only 5 animals were removed and all were uninfected according 
-#to spore count data. Start date of the experiment was chosen as 10/14/2022, which was the day 
-#before Past exposures when all animals were still living (this can be changed if necessary, 
-#but it wasn't used the in the mortality analysis).
-
-#Subset the data
-egg.life <- subset(total.egg, select=c("TreatmentGroup", "Rep", "PastExposed", "MetschExposed", "PastInfected", "MetschInfected", "PastExpStatus", "MetExpStatus", "DayMetNum", "DayMetFactor", "LifeRep", "death.date"))
-
-#Add in a censor column for the survival analysis, where 1 means censored and 2 means dead
-egg.life <- egg.life %>% 
-  mutate(censor = ifelse(death.date == "", 1, 2))
-
-#Add in the censor date for animals that did not die before the last day of the experiment
-egg.life$death.date[egg.life$death.date == ""] <- "12/19/2022"
-
-#Convert death date to a date in r
-egg.life <- egg.life %>%
-  mutate(death.date = as.Date(death.date, format = "%m/%d/%Y"))
-str(egg.life)
-
-#Add a column with experiment start date, which I set as the day before past exposure for now
-egg.life <- egg.life %>%
-  mutate(egg.life, start.date = "10/14/2022")
-str(egg.life)
-
-#Convert experiment start date to a date in r
-egg.life <- egg.life %>%
-  mutate(start.date = as.Date(start.date, format = "%m/%d/%Y"))
-
-#Add a column with length of survival time in days from start of experiment
-egg.life <- egg.life %>%
-  mutate(lifesurvival = as.duration(start.date %--% death.date) / ddays(1))
-
-#Subset the data to just treatments 3-6 for now
-#egg.life.3to6 <- subset(egg.life, PastExposed == "Yes" & DayMetNum != "0" & DayMetFactor != "0" & PastInfected != "NA")
-
-#Add in Past exposure date column
-egg.life <- egg.life %>%
-  mutate(PastExposureDate = "10/15/2022")
-str(egg.life)
-
-#Make past exposure date a date in r
-egg.life <- egg.life %>%
-  mutate(PastExposureDate = as.Date(PastExposureDate, format = "%m/%d/%Y"))
-
-#Add in Metsch exposure date columns
-egg.life <- egg.life %>%
-  mutate(MetschExposureDate = ifelse(DayMetNum == "5", "10/20/2022", 
-                                     ifelse(DayMetNum == "10", "10/25/2022",
-                                            ifelse(DayMetNum == "15", "10/30/2022", "11/14/2022"))))
-
-#Make metsch exposure dates into dates in r
-egg.life <- egg.life %>%
-  mutate(MetschExposureDate = as.Date(MetschExposureDate, format = "%m/%d/%Y"))
-str(egg.life)
-
-#Add in days of survival after exposure to past column
-egg.life <- egg.life %>%
-  mutate(PostPastSurvival = as.duration(PastExposureDate %--% death.date) / ddays(1))
-
-#Add in days of survival after exposure to metsch column
-egg.life <- egg.life %>%
-  mutate(PostMetSurvival = as.duration(MetschExposureDate %--% death.date) / ddays(1))
-
-#Subset the data to only include animals that made it a certain number of days past exposure to Past and Metsch (e stands for egg, l stands for life in the dataframe name)
-el.final <- subset(egg.life, lifesurvival > 10)
-
-#Add a factor column that has infection status as either None, Past, Metsch, or Coinf. This will be useful for graphing and model analysis.
-el.final <- el.final %>%
-  mutate(InfStatusFactor = ifelse(PastInfected == "Yes" & MetschInfected == "Yes", "Coinf",
-                                  ifelse(PastInfected == "Yes", "Past", 
-                                         ifelse(MetschInfected == "Yes", "Metsch", "Uninf"))))
-el.final$InfStatusFactor <- as.factor(el.final$InfStatusFactor)
-el.final$InfStatusFactor <- factor(el.final$InfStatusFactor, c("Uninf", "Past", "Metsch", "Coinf"))
-
-el.final$DayMetFactor <- factor(el.final$DayMetFactor)
-el.final$DayMetFactor <- relevel(el.final$DayMetFactor, "0")
-
-el.final.nouninf <- el.final %>%
-  filter(InfStatusFactor != "Uninf")
-
-
-totalegg.glm <- glmmTMB(LifeRep ~ DayMetFactor * InfStatusFactor * lifesurvival, family = nbinom1(), data = el.final.nouninf)
-summary(totalegg.glm)
-
-testDispersion(totalegg.glm)
-testZeroInflation(totalegg.glm)
-
-totalegg.glm_simResid <- simulateResiduals(fittedModel = totalegg.glm)
-plot(totalegg.glm_simResid)
-
-#I don't really understand emmeans but here goes nothing 
-emm_egg <- emmeans(totalegg.glm, ~ DayMetFactor * InfStatusFactor * lifesurvival) 
-summary(emm_egg)
-totalegg.glm.df <- emmeans(totalegg.glm, specs = pairwise ~ InfStatusFactor | DayMetFactor | lifesurvival, type = "response")
-totalegg.glm.df
-coinfmetspores.emm.df <- as.data.frame(coinfmetspores.glm.df$emmeans)
-
-plot(emm_egg)
-
-#Extract the means for Egg Production Based on Infection Status and Day of Metsch Exposure Numeric
-egg.means.3to6.DMnum <- el.3to6.final %>%
-  group_by(DayMetNum, InfStatusFactor) %>%
-  summarize(N  = length(LifeRep),
-            LifeRep.mean = mean(LifeRep, na.rm = T),
-            LifeRep.sd = sd(LifeRep, na.rm = T),
-            LifeRep.se = LifeRep.sd / sqrt(N))
 
 ##Survival 
 #Load necessary libraries

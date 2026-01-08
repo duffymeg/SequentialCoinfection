@@ -429,7 +429,7 @@ infectionplot <- (f1 | f2) / (f3 | f4) &
     strip.text = element_text(size = 16)
   )
 infectionplot
-ggsave("~/SequentialCoinfection/figures/infectionplot_withexposurelabels.png", infectionplot, dpi = 600, width = 12, height = 9.5, units = "in")
+ggsave("~/SequentialCoinfection/figures/infectionplot_withexposurelabels.png", infectionplot, dpi = 600, width = 20, height = 15, units = "in")
 
 ####Veering off into a different direction 
 #Testing if the liklihood of an individual to be coinfected changed depending on when metsch was added in 

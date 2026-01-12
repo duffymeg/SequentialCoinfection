@@ -20,6 +20,7 @@ library(ggtext)
 library(scales)
 library(patchwork)
 library(dplyr)
+library(forcats)
 
 #set working directory to work within GitHub
 setwd("~/SequentialCoinfection/data")
@@ -536,8 +537,184 @@ el.final$InfStatusFactor <- factor(el.final$InfStatusFactor, c("Uninf", "Past", 
 el.final$DayMetFactor <- factor(el.final$DayMetFactor)
 el.final$DayMetFactor <- relevel(el.final$DayMetFactor, "0")
 
-el.final.nouninf <- el.final %>%
-  filter(InfStatusFactor != "Uninf")
+#Never exposed get called uninfected 
+el.final <- el.final %>%
+  mutate(
+    InfStatusFactor = if_else(
+      TreatmentGroup == "T1",
+      fct_na_value_to_level(InfStatusFactor, "Uninf"),  # convert NAs to "Uninf" only for T1
+      InfStatusFactor  # keep the original value for other treatments
+    )
+  )
+
+el.final <- el.final %>%
+  mutate(
+    PastExpStatus = if_else(
+      TreatmentGroup == "T1",
+      fct_na_value_to_level(PastExpStatus, "Unexposed"),  # convert NAs to "Uninf" only for T1
+      PastExpStatus  # keep the original value for other treatments
+    )
+  )
+
+
+el.final <- el.final %>%
+  mutate(
+    MetExpStatus = if_else(
+      TreatmentGroup == "T1",
+      fct_na_value_to_level(MetExpStatus, "Unexposed"),  # convert NAs to "Uninf" only for T1
+      MetExpStatus  # keep the original value for other treatments
+    )
+  )
+
+#Finding the mean lifetime fecundity for each treatment 
+el.final_summary <- el.final %>%
+  group_by(DayMetFactor, InfStatusFactor, MetExpStatus, PastExpStatus) %>%
+  summarise(
+    n = n(),
+    total_fecundity = mean(LifeRep, na.rm = TRUE),
+    se_fecundity = sd(LifeRep, na.rm = TRUE) / sqrt(n),
+    .groups = "drop"
+  )
+
+clean_el.final_summary <- na.omit(el.final_summary)
+
+#Creating a facet plot based on terminal infection 
+uninf_egg_summary <- clean_el.final_summary %>%
+  filter(InfStatusFactor == "Uninf")
+
+e1<-ggplot(uninf_egg_summary, aes(x = DayMetFactor, y = total_fecundity, color = PastExpStatus, shape = MetExpStatus)) +
+  geom_point(size = 4, position = position_dodge(width = 0.4)) +
+  geom_errorbar(aes(ymin = total_fecundity - se_fecundity, ymax = total_fecundity + se_fecundity), 
+                width = 0.1, position = position_dodge(width = 0.4)) +
+  scale_color_manual(
+    values = c(
+      "Unexposed" = "black",
+      "ExposedUninfected" = "tomato")) +
+  ylab("Mean total fecundity per host") +
+  xlab(NULL) +
+  theme_classic() +
+  theme(
+    axis.title.x = ggtext::element_markdown(),
+    axis.title.y = ggtext::element_markdown(),
+    legend.text = ggtext::element_markdown(),
+    legend.title = ggtext::element_markdown(),
+    legend.position = c(.01, 1),
+    legend.justification = c("left", "top"),
+    legend.background = element_rect(fill = "white", color = "black", linewidth = 0.3)
+  ) +
+  labs(
+    color = "Exposed to *P. ramosa*",
+    shape = "Exposed to *A. monospora*",
+    title = "Uninfected"   # <-- add this line
+  ) +
+  scale_x_discrete(drop = FALSE) +
+  scale_y_continuous(labels = scales::label_comma()) +
+  scale_shape_manual(
+    values = c(
+      "ExposedUninfected" = 16,
+      "Unexposed" = 15)) + theme(plot.title = element_text(hjust = 0.5))
+
+#Creating the second graph for the egg facet plot 
+past_egg_summary <- clean_el.final_summary %>%
+  filter(InfStatusFactor == "Past")
+
+e2<-ggplot(past_egg_summary, aes(x = DayMetFactor, y = total_fecundity, shape = MetExpStatus)) +
+  geom_point(size = 4, position = position_dodge(width = 0.4)) +
+  geom_errorbar(aes(ymin = total_fecundity - se_fecundity, ymax = total_fecundity + se_fecundity), 
+                width = 0.1, position = position_dodge(width = 0.4)) +
+  ylab("Mean total fecundity per host") +
+  xlab(NULL) +
+  theme_classic() +
+  theme(
+    axis.title.x = ggtext::element_markdown(),
+    axis.title.y = ggtext::element_markdown(),
+    legend.text = ggtext::element_markdown(),
+    legend.title = ggtext::element_markdown(),
+    plot.title = ggtext::element_markdown(hjust = 0.5),
+    legend.position = c(.01, 1),
+    legend.justification = c("left", "top"),
+    legend.background = element_rect(fill = "white", color = "black", linewidth = 0.3)
+  ) +
+  labs(
+    shape = "Exposed to *A. monospora*",
+    title = "*P. ramosa*"   # <-- add this line
+  ) +
+  scale_x_discrete(drop = FALSE) +
+  scale_y_continuous(labels = scales::label_comma()) +
+  scale_shape_manual(
+    values = c(
+      "ExposedUninfected" = 16,
+      "Unexposed" = 15))
+
+#Creating the third graph for the egg facet plot 
+metsch_egg_summary <- clean_el.final_summary %>%
+  filter(InfStatusFactor == "Metsch")
+
+e3<-ggplot(metsch_egg_summary, aes(x = DayMetFactor, y = total_fecundity, color = PastExpStatus)) +
+  geom_point(size = 4, position = position_dodge(width = 0.4)) +
+  geom_errorbar(aes(ymin = total_fecundity - se_fecundity, ymax = total_fecundity + se_fecundity), 
+                width = 0.1, position = position_dodge(width = 0.4)) +
+  scale_color_manual(
+    values = c(
+      "Unexposed" = "black",
+      "ExposedUninfected" = "tomato")) +
+  ylab("Mean total fecundity per host") +
+  xlab("Day of exposure to *A. monospora*") +
+  theme_classic() +
+  theme(
+    axis.title.x = ggtext::element_markdown(),
+    axis.title.y = ggtext::element_markdown(),
+    legend.text = ggtext::element_markdown(),
+    legend.title = ggtext::element_markdown(),
+     plot.title = ggtext::element_markdown(hjust = 0.5),
+    legend.position = c(.01, 1),
+    legend.justification = c("left", "top"),
+    legend.background = element_rect(fill = "white", color = "black", linewidth = 0.3)
+  ) +
+  labs(
+    color = "Exposed to *P. ramosa*",
+    title = "*A. monospora*"   # <-- add this line
+  ) +
+  scale_x_discrete(drop = FALSE) +
+  scale_y_continuous(labels = scales::label_comma())
+
+#Creating the fourth graph for the egg facet plot 
+coinf_egg_summary <- clean_el.final_summary %>%
+  filter(InfStatusFactor == "Coinf")
+
+e4<-ggplot(coinf_egg_summary, aes(x = DayMetFactor, y = total_fecundity)) +
+  geom_point(size = 4, position = position_dodge(width = 0.4)) +
+  geom_errorbar(aes(ymin = total_fecundity - se_fecundity, ymax = total_fecundity + se_fecundity), 
+                width = 0.1, position = position_dodge(width = 0.4)) +
+  ylab("Mean total fecundity per host") +
+  xlab("Day of exposure to *A. monospora*") +
+  theme_classic() +
+  theme(
+    axis.title.x = ggtext::element_markdown(),
+    axis.title.y = ggtext::element_markdown(),
+    legend.text = ggtext::element_markdown(),
+    legend.title = ggtext::element_markdown(),
+    plot.title = ggtext::element_markdown(hjust = 0.5),
+    legend.position = c(.01, 1),
+    legend.justification = c("left", "top"),
+    legend.background = element_rect(fill = "white", color = "black", linewidth = 0.3)
+  )  + scale_x_discrete(drop = FALSE) + scale_y_continuous(labels = scales::label_comma()) +
+  labs(
+    title = "Coinfected"   # <-- add this line
+  )
+
+eggplot <- (e1 | e2) / (e3 | e4) &
+  theme(
+    text = element_text(size = 18),
+    axis.title = element_text(size = 18),
+    axis.text = element_text(size = 16),
+    legend.text = ggtext::element_markdown(size = 14),
+    legend.title = ggtext::element_markdown(size = 14),
+    strip.text = element_text(size = 18)
+  )
+eggplot
+ggsave("~/SequentialCoinfection/figures/eggplot.png", eggplot, dpi = 600, width = 18.5, height = 11, units = "in")
+
 
 
 totalegg.glm <- glmmTMB(LifeRep ~ DayMetFactor * InfStatusFactor * lifesurvival, family = nbinom1(), data = el.final.nouninf)

@@ -36,6 +36,8 @@ library(broom)
 library(forestmodel)
 library(knitr)
 library(kableExtra)
+library(flextable)
+library(modelsummary)
 
 #set working directory to work within GitHub
 setwd("~/SequentialCoinfection/data")
@@ -270,7 +272,7 @@ f2 <-ggplot(past_spores_summary, aes(x = DayMetFactor, y = mean_spores, color = 
 
 #Same thing as the two plots above, but for metsch 
 #finding prevalence of metsch infection 
-metsch_with_singlyexposed <- subset(spores.factor, TreatmentGroup %in% c("T2", "T3", "T4", "T5", "T6", "T7", "T8", "T9", "T10"))
+metsch_with_singlyexposed <- subset(spores.factor, TreatmentGroup %in% c("T3", "T4", "T5", "T6", "T7", "T8", "T9", "T10"))
 metsch_with_singlyexposed$DayMetFactor <- as.character(metsch_with_singlyexposed$DayMetFactor)
 metsch_with_singlyexposed$DayMetFactor[metsch_with_singlyexposed$DayMetFactor == "0"] <- "never"
 metsch_with_singlyexposed$DayMetFactor <- as.factor(metsch_with_singlyexposed$DayMetFactor)
@@ -799,13 +801,13 @@ s1<-ggplot(uninf_survival_summary, aes(x = DayMetFactor, y = mean_survival, colo
     title = "Uninfected"   # <-- add this line
   ) +
   scale_x_discrete(drop = FALSE) +
-  scale_y_continuous(labels = scales::label_comma()) +
+  scale_y_continuous(labels = scales::label_comma(), limits = c(0,75)) +
   scale_shape_manual(
     values = c(
       "ExposedUninfected" = 16,
       "Unexposed" = 15), labels = c(
         "ExposedUninfected" = "exposed but uninfected",
-        "Unexposed" = "unexposed")) + theme(plot.title = element_text(hjust = 0.5)) + ylim(0,75)
+        "Unexposed" = "unexposed"))
 
 past_survival_summary <- clean_survival_summary %>%
   filter(InfStatusFactor == "Past")
@@ -832,13 +834,13 @@ s2<-ggplot(past_survival_summary, aes(x = DayMetFactor, y = mean_survival, shape
     title = "*P. ramosa*"   # <-- add this line
   ) +
   scale_x_discrete(drop = FALSE) +
-  scale_y_continuous(labels = scales::label_comma()) +
+  scale_y_continuous(labels = scales::label_comma(), limits = c(0,75)) +
   scale_shape_manual(
     values = c(
       "ExposedUninfected" = 16,
       "Unexposed" = 15), labels = c(
         "ExposedUninfected" = "exposed but uninfected",
-        "Unexposed" = "unexposed")) + ylim(0,75)
+        "Unexposed" = "unexposed")) 
 
 metsch_survival_summary <- clean_survival_summary %>%
   filter(InfStatusFactor == "Metsch")
@@ -865,13 +867,13 @@ s3<-ggplot(metsch_survival_summary, aes(x = DayMetFactor, y = mean_survival, sha
     title = "*A. monospora*"   # <-- add this line
   ) +
   scale_x_discrete(drop = FALSE) +
-  scale_y_continuous(labels = scales::label_comma()) +
+  scale_y_continuous(labels = scales::label_comma(), limits = c(0,75)) +
   scale_shape_manual(
     values = c(
       "ExposedUninfected" = 16,
       "Unexposed" = 15), labels = c(
         "ExposedUninfected" = "exposed but uninfected",
-        "Unexposed" = "unexposed")) + ylim(0,75)
+        "Unexposed" = "unexposed"))
 
 coinf_survival_summary <- clean_survival_summary %>%
   filter(InfStatusFactor == "Coinf")
@@ -896,8 +898,8 @@ s4<-ggplot(coinf_survival_summary, aes(x = DayMetFactor, y = mean_survival)) +
     title = "Coinfected"
   ) +
   scale_x_discrete(drop = FALSE) +
-  scale_y_continuous(labels = scales::label_comma()) +
- theme(plot.title = element_text(hjust = 0.5)) + ylim(0,75)
+  scale_y_continuous(labels = scales::label_comma(), limits = c(0,75)) +
+ theme(plot.title = element_text(hjust = 0.5))
 
 survplot <- (s1 | s2) / (s3 | s4) +
   plot_annotation(
@@ -914,34 +916,34 @@ survplot <- (s1 | s2) / (s3 | s4) +
 survplot
 ggsave("~/SequentialCoinfection/figures/survplot_test.png", survplot, dpi = 600, width = 15, height = 12, units = "in")
 
-#Survivor analysis
-infected_el.final <- subset(el.final, !PastExpStatus == "ExposedUninfected")
-infected_el.final <- subset(infected_el.final, !MetExpStatus == "ExposedUninfected")
-infected_el.final$survobject <- with(infected_el.final, Surv(lifesurvival, censor))
-seq_lifespan <- survfit(survobject ~ InfStatusFactor, data = infected_el.final, conf.type = "log-log")
-summary(seq_lifespan)
+#Survivor analysis - Hazard Ratio
 
+#subsetting for only infected
+#infected_el.final <- subset(el.final, !PastExpStatus == "ExposedUninfected")
+#infected_el.final <- subset(infected_el.final, !MetExpStatus == "ExposedUninfected")
+
+#censor animals that did not die
+#infected_el.final$survobject <- with(infected_el.final, Surv(lifesurvival, censor))
+#seq_lifespan <- survfit(survobject ~ InfStatusFactor, data = infected_el.final, conf.type = "log-log")
+#summary(seq_lifespan)
+
+#Censor animals who lived to the end 
 el.final$survobject <- with(el.final, Surv(lifesurvival, censor))
-seq_lifespan <- survfit(survobject ~ InfStatusFactor, data = el.final, conf.type = "log-log")
-summary(seq_lifespan)
+#seq_lifespan <- survfit(survobject ~ InfStatusFactor, data = el.final, conf.type = "log-log")
+#summary(seq_lifespan)
 
+#Run Cox proportional hazards with interaction variables 
 cox.seqlifespan <- coxph(survobject ~ InfStatusFactor*DayMetFactor, data = el.final)
 summary(cox.seqlifespan)
 cox.test <- cox.zph(cox.seqlifespan)
 cox.test
+
+#I think this is showing that the hazards aren't exactly proportional across all times, but it should be fine? 
+#Cox is supposed to be fairly robust
 plot(cox.test)
 
-cox.seqlifespan <- coxph(survobject ~ InfStatusFactor*DayMetFactor, data = el.final)
-summary(cox.seqlifespan)
-cox.test <- cox.zph(cox.seqlifespan)
-cox.test
-plot(cox.test)
-
-#Plot it out 
+#Plot it out, not final plot 
 ggforest(cox.seqlifespan, data = el.final)
-forest_model
-
-forest_model(cox.seqlifespan)
 
 # Get tidy model results (HRs, CIs, p-values, etc.)
 tidy_fit <- tidy(cox.seqlifespan, exponentiate = TRUE, conf.int = TRUE)
@@ -984,7 +986,7 @@ subset_terms <- subset_terms |>
     TRUE            ~ ""
   ))
 
-#Making my forest plot 
+#Making my forest plot, this gets a depreciation warning because I am not specifying orientation of bars, but the code is running fine currently  
 ggplot(subset_terms, aes(y = fct_rev(term), x = estimate)) +
   geom_point(size = 3) +
   geom_errorbarh(aes(xmin = conf.low, xmax = conf.high), height = 0.2) +
@@ -1029,8 +1031,8 @@ ggplot(subset_terms, aes(y = fct_rev(term), x = estimate)) +
   labs(x = "Hazard Ratio (log scale)", y = NULL) +
   theme_classic(base_size = 14)
 
-ggsave("el.final.survival.tiff", dpi = 600, width = 10.5, height = 6, units = "in", compression="lzw")
-ggsave("el.final.survival.png", dpi = 600, width = 10.5, height = 6, units = "in")
+ggsave("~/SequentialCoinfection/figures/el.final.survival.tiff", dpi = 600, width = 10.5, height = 6, units = "in", compression="lzw")
+ggsave("~/SequentialCoinfection/figures/el.final.survival.png", dpi = 600, width = 10.5, height = 6, units = "in")
 
 
 #subset for just coinfected? 
@@ -1149,59 +1151,6 @@ ggplot(long.data, aes(x=days_since_past_exposure, y=transformedbody, shape=Treat
 
 long.data$Terminal.infection <- as.factor(long.data$Terminal.infection)
 long.data$Terminal.infection <- relevel(long.data$Terminal.infection, "none")
-#modelmix <- lmer(transformedbody ~ time * days_since_past_exposure * days_since_metsch_exposure * Terminal.infection * Coexposed + (1 | uniqueident), data = long.data) 
-#modelmix2_drop1 <- lmer(transformedbody ~ time * days_since_past_exposure * days_since_metsch_exposure + Terminal.infection + (1 | uniqueident), data = long.data)
-#anova(modelmix, modelmix2_drop1)
-
-#This one is the best one, but I'm worried about how to deal with controls, since time has been taken out? 
-#modelmix3_drop2 <- lmer(transformedbody ~ days_since_past_exposure * days_since_metsch_exposure + Terminal.infection + time + (1 | uniqueident), data = long.data) 
-#summary(modelmix3_drop2)
-
-#modelmix3_notime <- lmer(transformedbody ~ days_since_past_exposure * days_since_metsch_exposure + Terminal.infection + (1 | uniqueident), data = long.data) 
-#anova(modelmix3_drop2, modelmix3_notime) #time definitely makes things worse
-
-#modelmix3_nointeraction <- lmer(transformedbody ~ days_since_past_exposure + days_since_metsch_exposure + Terminal.infection + (1 | uniqueident), data = long.data) 
-#anova(modelmix3_notime, modelmix3_nointeraction)
-
-#summary(modelmix3_nointeraction)
-#plot(modelmix3_nointeraction)
-
-#modelmix3_nointeraction_simResid <- simulateResiduals(fittedModel = modelmix3_nointeraction)
-#plot(modelmix3_nointeraction_simResid)
-
-#modelmix4_interaction <- lmer(transformedbody ~ days_diff * days_since_metsch_exposure + Terminal.infection + (1 | uniqueident), data = long.data) 
-#anova(modelmix4_interaction, modelmix3_nointeraction)
-
-#summary(modelmix4_interaction)
-#plot(modelmix4_interaction)
-#modelmix4_interaction_simResid <- simulateResiduals(fittedModel = modelmix4_interaction)
-#plot(modelmix4_interaction_simResid)
-
-#Model 6 is the model going forward
-long.data_nocontrols <- subset(long.data, TreatmentGroup!= "T1")
-modelmix6 <- lmer(transformedbody ~ days_diff * days_since_metsch_exposure + Terminal.infection + (1 | uniqueident), data = long.data_nocontrols) 
-
-summary(modelmix6)
-plot(modelmix6)
-
-modelmix6_simResid <- simulateResiduals(fittedModel = modelmix6)
-plot(modelmix6_simResid)
-
-testDispersion(modelmix6)
-testZeroInflation(modelmix6)
-
-#Need to keep terminal infection even though nothing is significant 
-#modelmix5 <- lmer(transformedbody ~ days_diff * days_since_metsch_exposure + (1 | uniqueident), data = long.data) 
-#anova(modelmix4_interaction, modelmix5)
-
-#model validation - plotting normality of residuals 
-e <- resid(modelmix6)
-hist(e, xlab = "Residuals", main = "")
-
-plot(long.data_nocontrols$days_diff, e, xlab = "days difference",
-     ylab = "Residuals")
-plot(long.data_nocontrols$days_since_metsch_exposure, e, xlab = "days since metsch exposure",
-     ylab = "Residuals")
 
 #Adding breaks so the plots match 
 common_breaks <- seq(0, 65, by = 15)
@@ -1355,33 +1304,146 @@ bodysize <- (l1 | l2) / (l3 | l_blank)+
 bodysize
 ggsave("~/SequentialCoinfection/figures/bodysize.png", bodysize, dpi = 600, width = 15, height = 12, units = "in")
 
-totalegg.glm <- glmmTMB(LifeRep ~ DayMetFactor * InfStatusFactor * lifesurvival, family = nbinom1(), data = el.final.nouninf)
-summary(totalegg.glm)
+####Figure 6######
+####A giant table of models
 
-testDispersion(totalegg.glm)
-testZeroInflation(totalegg.glm)
+#Overdispersion check taken from Michelle's resource quality code 
+overdisp_fun <- function(model) {
+  rdf <- df.residual(model)
+  rp <- residuals(model,type="pearson")
+  Pearson.chisq <- sum(rp^2)
+  prat <- Pearson.chisq/rdf
+  pval <- pchisq(Pearson.chisq, df=rdf, lower.tail=FALSE)
+  c(chisq=Pearson.chisq,ratio=prat,rdf=rdf,p=pval)
+}
 
-totalegg.glm_simResid <- simulateResiduals(fittedModel = totalegg.glm)
-plot(totalegg.glm_simResid)
+#Does infection prevalence of past in coinfected treatments differ in comparison to control? NOTE: coinfected are considered as 
+#having past in this model 
+#past_only.glm <- glm(PastInfected_numeric ~ DayMetFactor, family = binomial, data = past)
+#summary(past_only.glm)
 
-#I don't really understand emmeans but here goes nothing 
-emm_egg <- emmeans(totalegg.glm, ~ DayMetFactor * InfStatusFactor * lifesurvival) 
-summary(emm_egg)
-totalegg.glm.df <- emmeans(totalegg.glm, specs = pairwise ~ InfStatusFactor | DayMetFactor | lifesurvival, type = "response")
-totalegg.glm.df
-coinfmetspores.emm.df <- as.data.frame(coinfmetspores.glm.df$emmeans)
+#Does the result change, as an ANOVA? - No 
+#past_only_anova <- anova(past_only.glm, test = "Chisq")
+#past_only_anova
 
-plot(emm_egg)
+#All checks taken from Michelle's data. Looks good. 
+#overdisp_fun(past_only.glm)
 
-#Extract the means for Egg Production Based on Infection Status and Day of Metsch Exposure Numeric
-egg.means.3to6.DMnum <- el.3to6.final %>%
-  group_by(DayMetNum, InfStatusFactor) %>%
-  summarize(N  = length(LifeRep),
-            LifeRep.mean = mean(LifeRep, na.rm = T),
-            LifeRep.sd = sd(LifeRep, na.rm = T),
-            LifeRep.se = LifeRep.sd / sqrt(N))
-####Veering off into a different direction 
-#Testing if the liklihood of an individual to be coinfected changed depending on when metsch was added in 
+#testDispersion(past_only.glm)
+#testZeroInflation(past_only.glm)
+
+#past_only.glm_simResid <- simulateResiduals(fittedModel = past_only.glm)
+#plot(past_only.glm_simResid)
+
+#Doing the same analysis, but with coinfected not considered past infected
+#past_coinfectednotpast <- past %>%
+#  mutate(
+#    PastInfected_numeric = if_else(
+#      Coinfected == "Yes",
+#      0,
+#      PastInfected_numeric
+#    )
+#  )
+
+#past_coinfectednotpast.glm <- glm(PastInfected_numeric ~ DayMetFactor, family = binomial, data = past_coinfectednotpast)
+#summary(past_coinfectednotpast.glm)
+
+#Does the result change, as an ANOVA? - No 
+#past_coinfectednotpast.glm_anova <- anova(past_coinfectednotpast.glm, test = "Chisq")
+#past_coinfectednotpast.glm_anova
+
+#All checks taken from Michelle's data. Looks good. 
+#overdisp_fun(past_coinfectednotpast.glm)
+
+#testDispersion(past_coinfectednotpast.glm)
+#testZeroInflation(past_coinfectednotpast.glm)
+
+#past_coinfectednotpast.glm_simResid <- simulateResiduals(fittedModel = past_coinfectednotpast.glm)
+#plot(past_coinfectednotpast.glm)
+
+past_prevalence.glm <- glm(PastInfected_numeric ~ DayMetFactor+Coinfected, family = binomial, data = past)
+summary(past_prevalence.glm)
+
+overdisp_fun(past_prevalence.glm)
+
+testDispersion(past_prevalence.glm)
+testZeroInflation(past_prevalence.glm)
+
+past_prevalence.glm_simResid <- simulateResiduals(fittedModel = past_prevalence.glm)
+plot(past_prevalence.glm_simResid)
+
+past_prevalence_anova <- anova(past_prevalence.glm, test = "Chisq")
+past_prevalence_anova
+
+#Now making a model for past and spore yield 
+#There is high variance leading to overdispersion
+mean(past_spores$Past.spore.in.animal)
+var(past_spores$Past.spore.in.animal)
+
+past_spore.glm <- glm(Past.spore.in.animal ~ DayMetFactor*Coinfected, data = past_spores)
+summary(past_spore.glm)
+
+#Michelle's overdispersion function shows this as being overdispersed but the second overdispersion test doesn't. Is there a case to 
+#be made to switch to quassipoisson? 
+overdisp_fun(past_spore.glm)
+
+testDispersion(past_spore.glm)
+testZeroInflation(past_spore.glm)
+
+past_spore.glm_simResid <- simulateResiduals(fittedModel = past_spore.glm)
+plot(past_spore.glm_simResid)
+
+#Adding post-hoc emmeans 
+past_spore_emm <- emmeans(
+  past_spore.glm,
+  ~ Coinfected | DayMetFactor,   # Compare Coinfected vs not, *within each treatment*
+  type = "response"              # Converts log-odds to probabilities (prevalence)
+)
+
+summary(past_spore_emm)
+#Does infection prevalence of metsch in coinfected treatments differ in comparison to control (also adding in past exposure)?
+metsch_prevalence.glm <- glm(MetschInfected_numeric ~ DayMetFactor+Coinfected+PastExposed, family = binomial, data = metsch_with_singlyexposed)
+summary(metsch_prevalence.glm)
+
+overdisp_fun(metsch_prevalence.glm)
+
+testDispersion(metsch_prevalence.glm)
+testZeroInflation(metsch_prevalence.glm)
+
+metsch_prevalence.glm_simResid <- simulateResiduals(fittedModel = metsch_prevalence.glm)
+plot(metsch_prevalence.glm_simResid)
+
+#Adding post-hoc for past exposure 
+emm_metsch_prevalence <- emmeans(
+  metsch_prevalence.glm,
+  ~ PastExposed | DayMetFactor,
+  type = "response"
+)
+
+summary(emm_metsch_prevalence)
+
+#Metsch spores analysis 
+metsch_spore.glm <- glm(Metsch.spore.in.animal ~ DayMetFactor*Coinfected*PastExposed, family = gaussian, data = metsch_spores)
+summary(metsch_spore.glm)
+
+overdisp_fun(metsch_spore.glm)
+
+testDispersion(metsch_spore.glm)
+testZeroInflation(metsch_spore.glm)
+
+metsch_spore.glm_simResid <- simulateResiduals(fittedModel = metsch_spore.glm)
+plot(metsch_spore.glm_simResid)
+
+#Adding post-hoc for past exposure 
+emm_metsch_spores <- emmeans(
+  metsch_spore.glm,
+  ~ PastExposed | DayMetFactor | Coinfected,
+  type = "response"
+)
+
+summary(emm_metsch_spores)
+
+#Does the prevalence of coinfection change over time? 
 onlycoinfectiontreatments <- subset(spores.factor, TreatmentGroup %in% c("T3", "T4", "T5", "T6"))
 levels(onlycoinfectiontreatments$Coinfected)[levels(onlycoinfectiontreatments$Coinfected) == "Yes"] <- "1"
 levels(onlycoinfectiontreatments$Coinfected)[levels(onlycoinfectiontreatments$Coinfected) == "No"] <- "0"
@@ -1392,297 +1454,129 @@ hist(onlycoinfectiontreatments$Past.spore.in.animal)
 onlycoinfectiontreatments.glm <- glm(Coinfected ~ DayMetFactor, family = binomial, data = onlycoinfectiontreatments)
 summary(onlycoinfectiontreatments.glm)
 
-#All checks taken from Michelle's data. Looks good. 
-overdisp_fun <- function(model) {
-  rdf <- df.residual(model)
-  rp <- residuals(model,type="pearson")
-  Pearson.chisq <- sum(rp^2)
-  prat <- Pearson.chisq/rdf
-  pval <- pchisq(Pearson.chisq, df=rdf, lower.tail=FALSE)
-  c(chisq=Pearson.chisq,ratio=prat,rdf=rdf,p=pval)
-}
 overdisp_fun(onlycoinfectiontreatments.glm)
- 
+
 testDispersion(onlycoinfectiontreatments.glm)
 testZeroInflation(onlycoinfectiontreatments.glm)
 
 onlycoinfectiontreatments.glm_simResid <- simulateResiduals(fittedModel = onlycoinfectiontreatments.glm)
 plot(onlycoinfectiontreatments.glm_simResid)
 
-#plot it out
-onlycoinfectiontreatments$Coinfected <- as.numeric(onlycoinfectiontreatments$Coinfected)
-dotchart(onlycoinfectiontreatments$Coinfected,
-         groups = factor(onlycoinfectiontreatments$DayMetFactor),
-         main = "Cleveland dotplot")
+coinf_anova <- anova(onlycoinfectiontreatments.glm, test = "Chisq")
+coinf_anova
 
-chai <- anova(onlycoinfectiontreatments.glm, test = "Chisq")
-chai
+#Moving on to fecundity
+totalegg.glm <- glmmTMB(LifeRep ~ InfStatusFactor + lifesurvival + DayMetFactor, family = nbinom1(), data = el.final)
+summary(totalegg.glm)
 
-#Do it again, but for metsch 
-coinfmetspores <- subset(metsch, Metsch.spore.in.animal > 0)
-hist(coinfmetspores$Metsch.spore.in.animal)
-hist(coinfmetspores$Past.spore.in.animal)
+testDispersion(totalegg.glm)
+testZeroInflation(totalegg.glm)
 
-coinfmetspores.glm <- glm(Metsch.spore.in.animal ~  DayMetFactor*Coinfected, data = coinfmetspores)
-summary(coinfmetspores.glm)
+totalegg.glm_simResid <- simulateResiduals(fittedModel = totalegg.glm)
+plot(totalegg.glm_simResid) # there are some patterns in the residual, but this is the best model 
 
-plot(coinfmetspores.glm)
+#I don't really understand emmeans but here goes nothing 
+emm_egg <- emmeans(totalegg.glm, ~ DayMetFactor * InfStatusFactor * lifesurvival) 
+summary(emm_egg)
 
-testDispersion(coinfmetspores.glm)
-testZeroInflation(coinfmetspores.glm)
+#totalegg.glm.df <- emmeans(totalegg.glm, specs = pairwise ~ InfStatusFactor | DayMetFactor | lifesurvival, type = "response")
+#totalegg.glm.df
+#coinfmetspores.emm.df <- as.data.frame(coinfmetspores.glm.df$emmeans)
 
-coinfmetspores.glm_simResid <- simulateResiduals(fittedModel = coinfmetspores.glm)
-plot(coinfmetspores.glm_simResid)
-
-coinfmetspores.glm.df <- emmeans(coinfmetspores.glm, specs = pairwise ~ Coinfected | DayMetFactor, type = "response")
-coinfmetspores.glm.df
-coinfmetspores.emm.df <- as.data.frame(coinfmetspores.glm.df$emmeans)
-
-#Extract contrasts (which are the Tukey comparisons between groups for p-values)
-coinf_emmeans <- coinfmetspores.glm.df$contrasts %>%
-  summary(infer = TRUE) %>%
-  as.data.frame()
-
-coinf_emmeans <- coinf_emmeans |> 
-  dplyr::mutate(across(where(is.numeric), ~ round(.x, 3)))
-
-coinf_emmeans <- coinf_emmeans %>%
-  rename(
-    Contrast = contrast,
-    `Day A. monospora was added` = DayMetFactor,
-    `Estimate` = estimate,
-    `Standard Error` = SE,
-    `Lower CL` = lower.CL,
-    `Upper CL` = upper.CL,
-    `t-value` = t.ratio,
-    `p-value` = p.value)
-
-kable(coinf_emmeans, caption = "Pairwise Comparisons of A. monospora spore yields") %>%
-  kable_styling()
-
-library(flextable)
-
-# Format ANOVA table
-ft_anova <- flextable(chai) |>
-  autofit() |>
-  set_caption("Analysis of Deviance (Likelihood Ratio Test)")
-
-# Format emmeans table
-ft_emm <- flextable(coinf_emmeans) |>
-  autofit() |>
-  set_caption("Estimated Marginal Means (on response scale)")
-
-# View in RStudio
-ft_anova
-ft_emm
-
-read_docx() |>
-  body_add_flextable(ft_model) |>
-  body_add_par("Estimated Marginal Means") |>
-  body_add_flextable(ft_emm) |>
-  print(target = "model_and_emmeans.docx")
-
-  
-# Get the formula as text
-model_formula <- as.character(formula(onlycoinfectiontreatments.glm))
-model_formula_text <- paste(model_formula, collapse = " ")
-
-# Add to table caption
-library(flextable)
-ft_anova <- flextable(chai) |>
-  autofit() |>
-  set_caption(paste0("Analysis of Deviance for Model: ", model_formula_text))
-
-#Make a plot showing how co-infection makeup changes through time
-#coinfmelt <- subset(onlycoinfectionspores, select = c(Past.spore.in.animal, Metsch.spore.in.animal, DayMetFactor))
-#coinfmelt$uniqident <- sample(1:31, replace=FALSE)
-#coinfmelt_melt <- melt(data = coinfmelt, 
-#                  id.vars = c("uniqident", "DayMetFactor"), 
-#    variable.name = "sporetype", value.name = "sporeload")
-
-#ggplot(coinfmelt_melt, aes(x=DayMetFactor, y=sporeload, group=sporetype, color=sporetype, fill=sporetype)) + geom_bar(position = "dodge", stat = "summary") +
-#  theme_classic() +  stat_summary(fun = "mean", geom = "col") +
-#  stat_summary(fun.data = "mean_se")
-  
-#Looking at total spore number in  past
-coinfandcontrol <- subset(spores.factor, TreatmentGroup %in% c("T3", "T4", "T5", "T6"))
-onlycoinfectionspores <- subset(coinfandcontrol, Past.spore.in.animal > 0)
-hist(onlycoinfectionspores$Metsch.spore.in.animal)
-hist(onlycoinfectionspores$Past.spore.in.animal)
-
-onlycoinfectionspores.glm <- glm(Past.spore.in.animal ~ DayMetFactor*Coinfected, data = onlycoinfectionspores)
-summary(onlycoinfectionspores.glm)
-
-plot(onlycoinfectionspores.glm)
-
-testDispersion(onlycoinfectionspores.glm)
-testZeroInflation(onlycoinfectionspores.glm)
-
-onlycoinfectionspores.glm_simResid <- simulateResiduals(fittedModel = onlycoinfectionspores.glm)
-plot(onlycoinfectionspores.glm_simResid)
-
-onlycoinfectionspores.glm.df <- emmeans(onlycoinfectionspores.glm, specs = pairwise ~ Coinfected | DayMetFactor, type = "response")
-onlycoinfectionspores.glm.df
-past.prod.m1.emm.df <- as.data.frame(onlycoinfectionspores.glm.df$emmeans)
-
-#Extract contrasts (which are the Tukey comparisons between groups for p-values)
-past_emmeans <- onlycoinfectionspores.glm.df$contrasts %>%
-  summary(infer = TRUE) %>%
-  as.data.frame()
-
-past_emmeans <- past_emmeans |> 
-  dplyr::mutate(across(where(is.numeric), ~ round(.x, 3)))
-
-past_emmeans <- past_emmeans %>%
-  rename(
-    Contrast = contrast,
-    `Day A. monospora was added` = DayMetFactor,
-    `Estimate` = estimate,
-    `Standard Error` = SE,
-    `Lower CL` = lower.CL,
-    `Upper CL` = upper.CL,
-    `t-value` = t.ratio,
-    `p-value` = p.value)
-
-kable(past_emmeans, caption = "Pairwise Comparisons of P. ramosa spore yields") %>%
-  kable_styling()
-
-
-#Make a plot showing how co-infection makeup changes through time
-#coinfmelt <- subset(onlycoinfectionspores, select = c(Past.spore.in.animal, Metsch.spore.in.animal, DayMetFactor))
-#coinfmelt$uniqident <- sample(1:16, replace=FALSE)
-#coinfmelt_melt <- melt(data = coinfmelt, 
-#                       id.vars = c("uniqident", "DayMetFactor"), 
-#                       variable.name = "sporetype", value.name = "sporeload")
-
-#ggplot(coinfmelt_melt, aes(x=DayMetFactor, y=sporeload, group=sporetype, color=sporetype, fill=sporetype)) + geom_bar(position = "dodge", stat = "summary") +
-#  theme_classic() +  stat_summary(fun = "mean", geom = "col") +
-#  stat_summary(fun.data = "mean_se")
-
-#Messing with proportion of metsch infection 
-metschprop <- subset(spores.factor, TreatmentGroup %in% c("T3", "T4", "T5", "T6", "T7", "T8", "T9", "T10"))
-
-#focusing on past exposed but not infected 
-metschprop_pastexposed <- subset(metschprop, PastInfected == "No")
-levels(metschprop_pastexposed$MetschInfected)[levels(metschprop_pastexposed$MetschInfected) == "Yes"] <- "1"
-levels(metschprop_pastexposed$MetschInfected)[levels(metschprop_pastexposed$MetschInfected) == "No"] <- "0"
-
-#Metch infection prevalence, there are some influential outliers but they are all legit so they are kept in 
-metschprop_pastexposed.glm2 <- glm(MetschInfected ~ PastExposed+DayMetFactor, family = binomial, data = metschprop_pastexposed)
-summary(metschprop_pastexposed.glm2)
-plot(metschprop_pastexposed.glm2)
-
-testDispersion(metschprop_pastexposed.glm2)
-testZeroInflation(metschprop_pastexposed.glm2)
-
-metschprop_pastexposed.glm2_simResid <- simulateResiduals(fittedModel = metschprop_pastexposed.glm2)
-plot(metschprop_pastexposed.glm2_simResid)
-
-metschprop_pastexposed.glm2.df <- emmeans(metschprop_pastexposed.glm2, specs = pairwise ~ PastExposed | DayMetFactor, type = "response")
-metschprop_pastexposed.glm2.df
-
-#look at spores 
-hist(metschprop_pastexposed$Metsch.spore.in.animal)
-
-#looks good 
-metschspores_pastexposed <- subset(metschprop_pastexposed, Metsch.spore.in.animal > 0)
-metschspores_pastexposed.glm <- glm(Metsch.spore.in.animal ~ PastExposed+DayMetFactor, data = metschspores_pastexposed)
-summary(metschspores_pastexposed.glm)
-plot(metschspores_pastexposed.glm)
-
-testDispersion(metschspores_pastexposed.glm)
-testZeroInflation(metschspores_pastexposed.glm)
-
-metschspores_pastexposed.glm_simResid <- simulateResiduals(fittedModel = metschspores_pastexposed.glm)
-plot(metschspores_pastexposed.glm_simResid)
-
-metschspores_pastexposed.glm.df <- emmeans(metschspores_pastexposed.glm, specs = pairwise ~ PastExposed | DayMetFactor, type = "response")
-metschspores_pastexposed.glm.df
-
-#Moving into proportion infected with metsch when animals are either past infected or not but exposed are taken out 
-metschprop_pastinfected <- subset(metschprop, PastInfected == "Yes" | PastExposed == "No")
-levels(metschprop_pastinfected$MetschInfected)[levels(metschprop_pastinfected$MetschInfected) == "Yes"] <- "1"
-levels(metschprop_pastinfected$MetschInfected)[levels(metschprop_pastinfected$MetschInfected) == "No"] <- "0"
-
-metschprop_pastinfected.glm <- glm(MetschInfected ~ PastInfected+DayMetFactor, family = binomial, data = metschprop_pastinfected)
-summary(metschprop_pastinfected.glm)
-
-testDispersion(metschprop_pastinfected.glm)
-testZeroInflation(metschprop_pastinfected.glm)
-
-metschprop_pastinfected.glm_simResid <- simulateResiduals(fittedModel = metschprop_pastinfected.glm)
-plot(metschprop_pastinfected.glm_simResid)
-
-#Moving on to spores
-metschspores_pastinfected <- subset(metschprop_pastinfected, Metsch.spore.in.animal > 0)
-metschspores_pastinfected.glm <- glm(Metsch.spore.in.animal ~ DayMetFactor + Past.spore.in.animal + PastInfected, data = metschspores_pastinfected)
-summary(metschspores_pastinfected.glm)
-plot(metschspores_pastinfected.glm)
-
-testDispersion(metschspores_pastinfected.glm)
-testZeroInflation(metschspores_pastinfected.glm)
-
-metschspores_pastinfected.glm_simResid <- simulateResiduals(fittedModel = metschspores_pastinfected.glm)
-plot(metschspores_pastinfected.glm_simResid)
-
-#Now on to past infection 
-pastprop <- subset(spores.factor, TreatmentGroup %in% c("T2" ,"T3", "T4", "T5", "T6"))
-
-#focusing on metsch exposed but not infected 
-pastprop_metexposed <- subset(pastprop, MetschInfected == "No")
-levels(pastprop_metexposed$PastInfected)[levels(pastprop_metexposed$PastInfected) == "Yes"] <- "1"
-levels(pastprop_metexposed$PastInfected)[levels(pastprop_metexposed$PastInfected) == "No"] <- "0"
-
-pastprop_metexposed.glm <- glm(PastInfected ~ MetschExposed+DayMetFactor, family = binomial, data = pastprop_metexposed)
-summary(pastprop_metexposed.glm)
-
-plot(pastprop_metexposed.glm)
-
-testDispersion(pastprop_metexposed.glm)
-testZeroInflation(pastprop_metexposed.glm)
-
-pastprop_metexposed.glm_simResid <- simulateResiduals(fittedModel = pastprop_metexposed.glm)
-plot(pastprop_metexposed.glm_simResid)
-
-### spores
-pastspores_metexposed <- subset(pastprop_metexposed, Past.spore.in.animal > 0)
-pastspores_metexposed.glm <- glm(Past.spore.in.animal ~ MetschExposed + DayMetFactor, data = pastspores_metexposed)
-summary(pastspores_metexposed.glm)
-
-plot(pastspores_metexposed.glm)
-
-testDispersion(pastprop_metexposed.glm)
-testZeroInflation(pastprop_metexposed.glm)
-
-pastspores_metexposed.glm_simResid <- simulateResiduals(fittedModel = pastspores_metexposed.glm)
-plot(pastspores_metexposed.glm_simResid)
+plot(emm_egg)
 
 #What's is up with the 30 day metsch? 
-justmetsch <- subset(spores.factor, TreatmentGroup %in% c("T7" ,"T8", "T9", "T10"))
-levels(justmetsch$MetschInfected)[levels(justmetsch$MetschInfected) == "Yes"] <- "1"
-levels(justmetsch$MetschInfected)[levels(justmetsch$MetschInfected) == "No"] <- "0"
+#justmetsch <- subset(spores.factor, TreatmentGroup %in% c("T7" ,"T8", "T9", "T10"))
+#levels(justmetsch$MetschInfected)[levels(justmetsch$MetschInfected) == "Yes"] <- "1"
+#levels(justmetsch$MetschInfected)[levels(justmetsch$MetschInfected) == "No"] <- "0"
 
-justmet_prop.glm <- glm(MetschInfected ~ DayMetFactor, family = binomial, data = justmetsch)
-summary(justmet_prop.glm)
+#justmet_prop.glm <- glm(MetschInfected ~ DayMetFactor, family = binomial, data = justmetsch)
+#summary(justmet_prop.glm)
 
-plot(justmet_prop.glm)
+#plot(justmet_prop.glm)
 
-testDispersion(justmet_prop.glm)
-testZeroInflation(justmet_prop.glm)
+#testDispersion(justmet_prop.glm)
+#testZeroInflation(justmet_prop.glm)
 
-justmet_prop.glm_simResid <- simulateResiduals(fittedModel = justmet_prop.glm)
-plot(justmet_prop.glm_simResid)
+#justmet_prop.glm_simResid <- simulateResiduals(fittedModel = justmet_prop.glm)
+#plot(justmet_prop.glm_simResid)
 
-justmet_spores <- subset(justmetsch, Metsch.spore.in.animal > 0)
+#justmet_spores <- subset(justmetsch, Metsch.spore.in.animal > 0)
 
-justmet_spores.glm <- glm(Metsch.spore.in.animal ~ DayMetFactor, data = justmet_spores)
-summary(justmet_spores.glm)
+#justmet_spores.glm <- glm(Metsch.spore.in.animal ~ DayMetFactor, data = justmet_spores)
+#summary(justmet_spores.glm)
 
-plot(justmet_spores.glm)
+#plot(justmet_spores.glm)
 
-testDispersion(justmet_spores.glm)
-testZeroInflation(justmet_spores.glm)
+#testDispersion(justmet_spores.glm)
+#testZeroInflation(justmet_spores.glm)
 
-justmet_spores.glm_simResid <- simulateResiduals(fittedModel = justmet_spores.glm)
-plot(justmet_spores.glm_simResid)
+#justmet_spores.glm_simResid <- simulateResiduals(fittedModel = justmet_spores.glm)
+#plot(justmet_spores.glm_simResid)
+
+#modelmix <- lmer(transformedbody ~ time * days_since_past_exposure * days_since_metsch_exposure * Terminal.infection * Coexposed + (1 | uniqueident), data = long.data) 
+#modelmix2_drop1 <- lmer(transformedbody ~ time * days_since_past_exposure * days_since_metsch_exposure + Terminal.infection + (1 | uniqueident), data = long.data)
+#anova(modelmix, modelmix2_drop1)
+
+#This one is the best one, but I'm worried about how to deal with controls, since time has been taken out? 
+#modelmix3_drop2 <- lmer(transformedbody ~ days_since_past_exposure * days_since_metsch_exposure + Terminal.infection + time + (1 | uniqueident), data = long.data) 
+#summary(modelmix3_drop2)
+
+#modelmix3_notime <- lmer(transformedbody ~ days_since_past_exposure * days_since_metsch_exposure + Terminal.infection + (1 | uniqueident), data = long.data) 
+#anova(modelmix3_drop2, modelmix3_notime) #time definitely makes things worse
+
+#modelmix3_nointeraction <- lmer(transformedbody ~ days_since_past_exposure + days_since_metsch_exposure + Terminal.infection + (1 | uniqueident), data = long.data) 
+#anova(modelmix3_notime, modelmix3_nointeraction)
+
+#summary(modelmix3_nointeraction)
+#plot(modelmix3_nointeraction)
+
+#modelmix3_nointeraction_simResid <- simulateResiduals(fittedModel = modelmix3_nointeraction)
+#plot(modelmix3_nointeraction_simResid)
+
+#modelmix4_interaction <- lmer(transformedbody ~ days_diff * days_since_metsch_exposure + Terminal.infection + (1 | uniqueident), data = long.data) 
+#anova(modelmix4_interaction, modelmix3_nointeraction)
+
+#summary(modelmix4_interaction)
+#plot(modelmix4_interaction)
+#modelmix4_interaction_simResid <- simulateResiduals(fittedModel = modelmix4_interaction)
+#plot(modelmix4_interaction_simResid)
+
+#modelmix6 <- lmer(transformedbody ~ days_diff + days_since_metsch_exposure + Terminal.infection + (1 | uniqueident), data = long.data) 
+
+modelmix7 <- lmer(transformedbody ~ time * DayMet * Terminal.infection + (1 | uniqueident), data = long.data) 
+
+summary(modelmix7)
+plot(modelmix7)
+
+modelmix7_simResid <- simulateResiduals(fittedModel = modelmix7)
+plot(modelmix7_simResid)
+
+testDispersion(modelmix7)
+testZeroInflation(modelmix7)
+
+#Need to keep terminal infection even though nothing is significant 
+#modelmix5 <- lmer(transformedbody ~ days_diff * days_since_metsch_exposure + (1 | uniqueident), data = long.data) 
+#anova(modelmix4_interaction, modelmix5)
+
+#Plotting models to make a table 
+tab1 <- as.data.frame(past_spore_emm)
+tab3 <- as.data.frame(emm_metsch_spores)
+
+tab1$model <- "P. ramosa spore model"
+tab3$model <- "A. monospora spore model"
+
+all_tabs <- rbind(tab1, tab3)
+
+pub_tab <- pub_tab %>%
+  mutate(
+    across(where(is.numeric), ~ round(.x, 2))
+  )
+
+spore_yield_table<-gt(pub_tab) %>%
+  tab_header(
+    title = "Estimated Marginal Means Across Spore Yield Models"
+  )
+gtsave(spore_yield_table,"emmeans_spore_yield_table.docx")
+
 

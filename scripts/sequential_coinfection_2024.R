@@ -1305,7 +1305,7 @@ bodysize
 ggsave("~/SequentialCoinfection/figures/bodysize.png", bodysize, dpi = 600, width = 15, height = 12, units = "in")
 
 ####Figure 6######
-####A giant table of models
+####All of the models  for this paper
 
 #Overdispersion check taken from Michelle's resource quality code 
 overdisp_fun <- function(model) {

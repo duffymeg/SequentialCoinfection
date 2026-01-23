@@ -1,8 +1,11 @@
 #Updated to work with GitHub on 1/19/26
 #Load libraries
 library(tidyverse)
+library(patchwork)
+library(forcats)
 library(car)
 library(emmeans)
+
 library(ggeffects)
 library(reshape2)
 library(Rcpp)
@@ -18,9 +21,7 @@ library(parsedate)
 library(here)
 library(ggtext)
 library(scales)
-library(patchwork)
 library(dplyr)
-library(forcats)
 library(ggplot2)
 library(FSA)
 library(nlstools)
@@ -122,31 +123,30 @@ spores.numeric <- subset(total.spores, select = c("Metsch.spore.in.animal", "Pas
 ####Creating figure 2#####
 
 #facet plot of infection prevalence and spores 
-past <- subset(spores.factor, TreatmentGroup %in% c("T2", "T3", "T4", "T5", "T6"))
-past$DayMetFactor <- as.character(past$DayMetFactor)
-past$DayMetFactor[past$DayMetFactor == "0"] <- "never"
-past$DayMetFactor <- as.factor(past$DayMetFactor)
-past$DayMetFactor <- factor(past$DayMetFactor,levels = c("never", "5", "10", "15", "30"))
+past <- subset(spores.numeric, TreatmentGroup %in% c("T2", "T3", "T4", "T5", "T6"))
+#past$DayMetFactor <- as.character(past$DayMetFactor)
+#past$DayMetFactor[past$DayMetFactor == "0"] <- "never"
+#past$DayMetFactor <- as.factor(past$DayMetFactor)
+#past$DayMetFactor <- factor(past$DayMetFactor,levels = c("never", "5", "10", "15", "30"))
 
 #first part of the facet plot
 #finding prevalence of past infection 
 past$PastInfected_numeric <- ifelse(past$PastInfected == "Yes", 1, 0)
-past <- na.omit(past)
+past <- subset(past, !DayMetNum == "0")
 
-#I embrace our AI future because I could not have written this without chatGPT 
 # Step 1: Create the base prevalence data
 prevalence_by_coinfection <- past %>%
   filter(PastInfected_numeric == 1) %>%
-  group_by(DayMetFactor, Coinfected) %>%
+  group_by(DayMetNum, Coinfected) %>%
   summarise(
     infected_n = n(),
     .groups = "drop"
   ) %>%
   left_join(
     past %>%
-      group_by(DayMetFactor) %>%
+      group_by(DayMetNum) %>%
       summarise(total_n = n(), .groups = "drop"),
-    by = "DayMetFactor"
+    by = "DayMetNum"
   ) %>%
   mutate(
     prevalence = infected_n / total_n,
@@ -155,7 +155,7 @@ prevalence_by_coinfection <- past %>%
 
 # Step 2: Add a "sum" row per DayMetFactor
 prevalence_sum <- prevalence_by_coinfection %>%
-  group_by(DayMetFactor) %>%
+  group_by(DayMetNum) %>%
   summarise(
     infected_n = sum(infected_n),
     total_n = first(total_n),  # same total for both groups
@@ -176,10 +176,10 @@ prevalence_combined$Coinfected <- factor(
 
 
 #Making this facet plot by stacked with coinfected vs singly infected 
-f1 <-ggplot(prevalence_combined, aes(x = DayMetFactor, y = prevalence, color = Coinfected)) +
-  geom_point(size = 4, position = position_dodge(width = 0.4)) +
+f1<-ggplot(prevalence_combined, aes(x = DayMetNum, y = prevalence, color = Coinfected)) +
+  geom_point(size = 4, position = position_dodge(width = 1.75)) +
   geom_errorbar(aes(ymin = prevalence - se, ymax = prevalence + se), 
-                width = 0.1, position = position_dodge(width = 0.4)) +
+                width = 0.1, position = position_dodge(width = 1.75)) +
   scale_color_manual(
     values = c(
       "single infection" = "cornflowerblue",
@@ -188,7 +188,7 @@ f1 <-ggplot(prevalence_combined, aes(x = DayMetFactor, y = prevalence, color = C
     ), labels = c(
       "single infection" = "single infection",
       "coinfection" = "coinfection",
-      "total" = "overall")) +
+      "total" = "total *P. ramosa* infection in coexposed treatments")) +
   ylab("Infection prevalence of *P. ramosa*") +
   xlab(NULL) +
   theme_classic() +
@@ -207,7 +207,7 @@ past_spores <- subset(past, PastInfected == "Yes")
 
 #Creating a dataset that averages spores by treatment 
 past_spores_summary <- past_spores %>%
-  group_by(DayMetFactor, Coinfected) %>%
+  group_by(DayMetNum, Coinfected) %>%
   summarise(
     n = n(),
     mean_spores = mean(Past.spore.in.animal, na.rm = TRUE),
@@ -222,17 +222,17 @@ past_spores_summary$Coinfected <- factor(
   labels = c("single infection", "coinfection"))
 
 #Past spores plotted 
-f2 <-ggplot(past_spores_summary, aes(x = DayMetFactor, y = mean_spores, color = Coinfected)) +
-  geom_point(size = 4, position = position_dodge(width = 0.4)) +
+f2<-ggplot(past_spores_summary, aes(x = DayMetNum, y = mean_spores, color = Coinfected)) +
+  geom_point(size = 4, position = position_dodge(width = 1.75)) +
   geom_errorbar(aes(ymin = mean_spores - se_spores, ymax = mean_spores + se_spores), 
-                width = 0.1, position = position_dodge(width = 0.4)) +
+                width = 0.1, position = position_dodge(width = 1.75)) +
   scale_color_manual(
     values = c(
       "single infection" = "cornflowerblue",
       "coinfection" = "#7f39d4"), labels = c(
       "single infection" = "single infection",
       "coinfection" = "coinfection")) +
-  ylab("Mean spores per host *P. ramosa*") +
+  ylab("Mean *P. ramosa* spores per host") +
   xlab(NULL) +
   theme_classic() +
   theme(
@@ -242,7 +242,7 @@ f2 <-ggplot(past_spores_summary, aes(x = DayMetFactor, y = mean_spores, color = 
     legend.position = c(.01, 1),
     legend.justification = c("left", "top"),
     legend.background = element_rect(fill = "white", color = "black", linewidth = 0.3)
-  ) + labs(color = NULL) + scale_x_discrete(drop = FALSE) + scale_y_continuous(labels = scales::label_comma())
+  ) + labs(color = NULL) + scale_y_continuous(labels = scales::label_comma()) + ylim(0, 900000)
 
 
 #The same data as above,but in a violin plot 
@@ -272,30 +272,30 @@ f2 <-ggplot(past_spores_summary, aes(x = DayMetFactor, y = mean_spores, color = 
 
 #Same thing as the two plots above, but for metsch 
 #finding prevalence of metsch infection 
-metsch_with_singlyexposed <- subset(spores.factor, TreatmentGroup %in% c("T3", "T4", "T5", "T6", "T7", "T8", "T9", "T10"))
-metsch_with_singlyexposed$DayMetFactor <- as.character(metsch_with_singlyexposed$DayMetFactor)
-metsch_with_singlyexposed$DayMetFactor[metsch_with_singlyexposed$DayMetFactor == "0"] <- "never"
-metsch_with_singlyexposed$DayMetFactor <- as.factor(metsch_with_singlyexposed$DayMetFactor)
-metsch_with_singlyexposed$DayMetFactor <- factor(metsch_with_singlyexposed$DayMetFactor,levels = c("never", "5", "10", "15", "30"))
+metsch_with_singlyexposed <- subset(spores.numeric, TreatmentGroup %in% c("T3", "T4", "T5", "T6", "T7", "T8", "T9", "T10"))
+#metsch_with_singlyexposed$DayMetFactor <- as.character(metsch_with_singlyexposed$DayMetFactor)
+#metsch_with_singlyexposed$DayMetFactor[metsch_with_singlyexposed$DayMetFactor == "0"] <- "never"
+#metsch_with_singlyexposed$DayMetFactor <- as.factor(metsch_with_singlyexposed$DayMetFactor)
+#metsch_with_singlyexposed$DayMetFactor <- factor(metsch_with_singlyexposed$DayMetFactor,levels = c("never", "5", "10", "15", "30"))
 
 #third part of the facet plot
 #finding prevalence of metsch infection 
 metsch_with_singlyexposed$MetschInfected_numeric <- ifelse(metsch_with_singlyexposed$MetschInfected == "Yes", 1, 0)
-metsch_with_singlyexposed <- na.omit(metsch_with_singlyexposed)
+#metsch_with_singlyexposed <- na.omit(metsch_with_singlyexposed)
 
 # Step 1: Create the base prevalence data
 prevalence_by_coinfection_metsch_with_singlyexposed <- metsch_with_singlyexposed %>%
   filter(MetschInfected_numeric == 1) %>%
-  group_by(DayMetFactor, Coinfected, PastExpStatus) %>%
+  group_by(DayMetNum, Coinfected, PastExpStatus) %>%
   summarise(
     infected_n = n(),
     .groups = "drop"
   ) %>%
   left_join(
     past %>%
-      group_by(DayMetFactor) %>%
+      group_by(DayMetNum) %>%
       summarise(total_n = n(), .groups = "drop"),
-    by = "DayMetFactor"
+    by = "DayMetNum"
   ) %>%
   mutate(
     prevalence = infected_n / total_n,
@@ -306,7 +306,7 @@ prevalence_by_coinfection_metsch_with_singlyexposed <- metsch_with_singlyexposed
 prevalence_metsch_sum_with_singly_exposed <-
   prevalence_by_coinfection_metsch_with_singlyexposed %>%
   filter(PastExpStatus %in% c("ExposedUninfected", "Infected")) %>%
-  group_by(DayMetFactor) %>%
+  group_by(DayMetNum) %>%
   summarise(
     infected_n = sum(infected_n),
     total_n = first(total_n),
@@ -331,20 +331,41 @@ prevalence_combined_metsch_with_singly_exposed$PastExpStatus <- factor(
   levels = c("ExposedUninfected", "Unexposed", "Infected", "Summed"),
   labels = c("exposed but uninfected", "unexposed", "infected", "overall (only coexposed treatments)"))
 
+fig3_data <- prevalence_combined_metsch_with_singly_exposed %>%
+  filter(!(Coinfected == "single infection" & PastExpStatus == "exposed but uninfected"))
+
+fig3_data <- fig3_data %>%
+  mutate(group = paste(Coinfected, PastExpStatus, sep = " | "))
+
 #Third plot for the facet plot
-f3<-ggplot(prevalence_combined_metsch_with_singly_exposed, aes(x = DayMetFactor, y = prevalence, color = Coinfected, shape = PastExpStatus)) +
-  geom_point(size = 4, position = position_dodge(width = 0.4)) +
+f3<-ggplot(fig3_data, aes(x = DayMetNum, y = prevalence, color = group, shape = group)) +
+  geom_point(size = 4, position = position_dodge(width = 1.75)) +
   geom_errorbar(aes(ymin = prevalence - se, ymax = prevalence + se), 
-                width = 0.1, position = position_dodge(width = 0.4)) +
+                width = 0.1, position = position_dodge(width = 1.75)) +
   scale_color_manual(
     values = c(
-      "single infection" = "tomato",
-      "coinfection" = "#7f39d4",
-      "total" = "black"
-    ), labels = c(
-      "single infection" = "single infection",
-      "coinfection" = "coinfection",
-      "total" = "overall")) +
+      "single infection | unexposed" = "tomato",
+      "coinfection | infected" = "#7f39d4",
+      "total | overall (only coexposed treatments)" = "black"
+    ),
+    labels = c(
+      "single infection | unexposed" = "single infection, never exposed to *P. ramosa*",
+      "coinfection | infected" = "coinfection",
+      "total | overall (only coexposed treatments)" = "total *A. monospora* infection in coexposed treatments"
+    )
+  ) +
+  scale_shape_manual(
+    values = c(
+      "single infection | unexposed" = 16,
+      "coinfection | infected" = 17,
+      "total | overall (only coexposed treatments)" = 18
+    ),
+    labels = c(
+      "single infection | unexposed" = "single infection, never exposed to *P. ramosa*",
+      "coinfection | infected" = "coinfection",
+      "total | overall (only coexposed treatments)" = "total *A. monospora* infection in coexposed treatments"
+    )
+  ) +
   ylab("Infection prevalence of *A. monospora*") +
   xlab("Day of exposure to *A. monospora*") +
   theme_classic() +
@@ -356,9 +377,16 @@ f3<-ggplot(prevalence_combined_metsch_with_singly_exposed, aes(x = DayMetFactor,
     legend.position = c(.01, 1),
     legend.justification = c("left", "top"),
     legend.background = element_rect(fill = "white", color = "black", linewidth = 0.3)
-  ) + labs(color = NULL) +
-  coord_cartesian(ylim = c(0, 1)) + scale_x_discrete(drop = FALSE) + labs(shape = "Exposed to *P. ramosa*") + scale_shape_manual(
-    values = c("exposed but uninfected" = 16, "unexposed" = 15, "infected" = 17, "overall (only coexposed treatments)" = 18))
+  ) +
+  coord_cartesian(ylim = c(0, 1)) +
+  guides(
+    color = guide_legend(
+      title = NULL,
+      title.theme = ggtext::element_markdown(),
+      override.aes = list(shape = c(17, 16, 18))
+    ),
+    shape = "none"
+  )
 
 #fourth part of the facet plot
 # Spore count summary
@@ -366,7 +394,7 @@ metsch_spores <- subset(metsch_with_singlyexposed, MetschInfected == "Yes")
 
 #Creating a dataset that averages spores by treatment 
 metsch_spores_summary <- metsch_spores %>%
-  group_by(DayMetFactor, Coinfected, PastExpStatus) %>%
+  group_by(DayMetNum, Coinfected, PastExpStatus) %>%
   summarise(
     n = n(),
     mean_spores = mean(Metsch.spore.in.animal, na.rm = TRUE),
@@ -380,18 +408,42 @@ metsch_spores_summary$Coinfected <- factor(
   levels = c("No", "Yes"),
   labels = c("single infection", "coinfection"))
 
-#Past spores plotted 
-f4<-ggplot(metsch_spores_summary, aes(x = DayMetFactor, y = mean_spores, color = Coinfected, shape = PastExpStatus)) +
-  geom_point(size = 4, position = position_dodge(width = 0.4)) +
+#fig4_data <- metsch_spores_summary %>%
+#  filter(!(Coinfected == "single infection" & PastExpStatus == "exposed but uninfected"))
+
+fig4_data <- fig4_data %>%
+  mutate(group = paste(Coinfected, PastExpStatus, sep = " | "))
+
+#Metsch spores plotted 
+f4<-ggplot(fig4_data, aes(x = DayMetNum, y = mean_spores, color = group, shape = group)) +
+  geom_point(size = 4, position = position_dodge(width = 1.75)) +
   geom_errorbar(aes(ymin = mean_spores - se_spores, ymax = mean_spores + se_spores), 
-                width = 0.1, position = position_dodge(width = 0.4)) +
+                width = 0.1, position = position_dodge(width = 1.75)) +
   scale_color_manual(
     values = c(
-      "single infection" = "tomato",
-      "coinfection" = "#7f39d4"), labels = c(
-        "single infection" = "single infection",
-        "coinfection" = "coinfection")) +
-  ylab("Mean spores per host *A. monospora*") +
+      "single infection | ExposedUninfected" = "tomato4",
+      "coinfection | Infected" = "#7f39d4",
+      "single infection | Unexposed" = "tomato"
+    ),
+    labels = c(
+      "single infection | ExposedUninfected" = "single infection, exposed to *P. ramosa*",
+      "coinfection | Infected" = "coinfection",
+      "single infection | Unexposed" = "single infection, never exposed to *P. ramosa*"
+    )
+  ) +
+  scale_shape_manual(
+    values = c(
+      "single infection | ExposedUninfected" = 15,
+      "coinfection | Infected" = 17,
+      "single infection | Unexposed" = 16
+    ),
+    labels = c(
+      "single infection | ExposedUninfected" = "single infected, exposed to *P. ramosa*",
+      "coinfection | Infected" = "coinfection",
+      "single infection | Unexposed" = "single infected, never exposed to *P. ramosa*"
+    )
+  ) +
+  ylab("Mean *A. monospora* spores per host") +
   xlab("Day of exposure to *A. monospora*") +
   theme_classic() +
   theme(
@@ -399,19 +451,19 @@ f4<-ggplot(metsch_spores_summary, aes(x = DayMetFactor, y = mean_spores, color =
     axis.title.y = ggtext::element_markdown(),
     legend.text = ggtext::element_markdown(),
     legend.title = ggtext::element_markdown(),
-    legend.position = c(.01, .4),
+    legend.position = c(.01, 1),
     legend.justification = c("left", "top"),
     legend.background = element_rect(fill = "white", color = "black", linewidth = 0.3)
-  ) + labs(color = NULL) + scale_x_discrete(drop = FALSE) + scale_y_continuous(labels = scales::label_comma()) + labs(shape = "Exposed to *P. ramosa*") +
-  scale_shape_manual(
-    values = c(
-      "ExposedUninfected" = 16, "Unexposed" = 15, "Infected" = 17),
-    labels = c(
-      "ExposedUninfected" = "exposed but uninfected",
-      "Unexposed" = "unexposed",
-      "Infected" = "infected")) + guides(
-        shape = guide_legend(order = 1),
-        color = guide_legend(order = 2)) + ylim(0, 175000)
+  ) +
+  guides(
+    color = guide_legend(
+      title = NULL,
+      title.theme = ggtext::element_markdown(),
+      override.aes = list(shape = c(17, 15, 16))
+    ),
+    shape = "none"
+  ) + ylim(0, 250000)
+
 
 #same data as above, but in a violin plot 
 #ggplot(metsch_spores, aes(x = Coinfected, y = Metsch.spore.in.animal, color = DayMetFactor)) +
@@ -593,7 +645,7 @@ el.final$egg_per_day <- el.final$LifeRep/el.final$lifesurvival
 
 #Finding the mean lifetime fecundity for each treatment 
 el.final_summary <- el.final %>%
-  group_by(DayMetFactor, InfStatusFactor, MetExpStatus, PastExpStatus) %>%
+  group_by(DayMetNum, InfStatusFactor, MetExpStatus, PastExpStatus) %>%
   summarise(
     n = n(),
     total_fecundity = mean(egg_per_day, na.rm = TRUE),
@@ -603,22 +655,23 @@ el.final_summary <- el.final %>%
 
 clean_el.final_summary <- na.omit(el.final_summary)
 
-levels(clean_el.final_summary$DayMetFactor) <- 
-  sub("^0$", "never", levels(clean_el.final_summary$DayMetFactor))
+#levels(clean_el.final_summary$DayMetFactor) <- 
+#  sub("^0$", "never", levels(clean_el.final_summary$DayMetFactor))
+
+#Drop the 0 time point 
+clean_el.final_summary <- subset(clean_el.final_summary, !DayMetNum == "0")
 
 #Creating a facet plot based on terminal infection 
 uninf_egg_summary <- clean_el.final_summary %>%
   filter(InfStatusFactor == "Uninf")
 
-e1<-ggplot(uninf_egg_summary, aes(x = DayMetFactor, y = total_fecundity, color = MetExpStatus, shape = PastExpStatus)) +
-  geom_point(size = 4, position = position_dodge(width = 0.4)) +
+e1<-ggplot(uninf_egg_summary, aes(x = DayMetNum, y = total_fecundity, shape = PastExpStatus)) +
+  geom_point(size = 4, position = position_dodge(width = 1), color = "green3") +
   geom_errorbar(aes(ymin = total_fecundity - se_fecundity, ymax = total_fecundity + se_fecundity), 
-                width = 0.1, position = position_dodge(width = 0.4)) +
+                width = 0.1, position = position_dodge(width = 1), color = "green3") +
   scale_color_manual(
-    values = c(
-      "Unexposed" = "black",
-      "ExposedUninfected" = "green3"), labels = c(
-        "ExposedUninfected" = "exposed but uninfected",
+  labels = c(
+        "ExposedUninfected" = "exposed to *P. ramosa*",
         "Unexposed" = "unexposed")) +
   ylab("Mean fecundity per host per day") +
   xlab(NULL) +
@@ -628,32 +681,33 @@ e1<-ggplot(uninf_egg_summary, aes(x = DayMetFactor, y = total_fecundity, color =
     axis.title.y = ggtext::element_markdown(),
     legend.text = ggtext::element_markdown(),
     legend.title = ggtext::element_markdown(),
-    legend.position = c(.01, .45),
+    legend.position = c(.01, 1),
     legend.justification = c("left", "top"),
     legend.background = element_rect(fill = "white", color = "black", linewidth = 0.3)
   ) +
   labs(
-    color = "Exposed to *A. monospora*",
-    shape = "Exposed to *P. ramosa*",
-    title = "Uninfected"   # <-- add this line
+    shape = NULL,
+    title = "Uninfected"   
   ) +
-  scale_x_discrete(drop = FALSE) +
   scale_y_continuous(labels = scales::label_comma()) +
   scale_shape_manual(
     values = c(
       "ExposedUninfected" = 16,
       "Unexposed" = 15), labels = c(
-        "ExposedUninfected" = "exposed but uninfected",
-        "Unexposed" = "unexposed")) + theme(plot.title = element_text(hjust = 0.5)) + ylim(0, 3)
+        "ExposedUninfected" = "exposed to *P. ramosa*", "Unexposed" = "unexposed")) + theme(plot.title = element_text(hjust = 0.5)) + ylim(0, 3)
+
+#Add a reference line for mean uninfected eggs 
+mean(uninf_egg_summary$total_fecundity)
 
 #Creating the second graph for the egg facet plot 
 past_egg_summary <- clean_el.final_summary %>%
   filter(InfStatusFactor == "Past")
 
-e2<-ggplot(past_egg_summary, aes(x = DayMetFactor, y = total_fecundity, shape = MetExpStatus)) +
+e2<-ggplot(past_egg_summary, aes(x = DayMetNum, y = total_fecundity, shape = MetExpStatus)) +
   geom_point(size = 4, position = position_dodge(width = 0.4), color = "cornflowerblue") +
   geom_errorbar(aes(ymin = total_fecundity - se_fecundity, ymax = total_fecundity + se_fecundity), 
                 width = 0.1, position = position_dodge(width = 0.4), color = "cornflowerblue") +
+  geom_hline(yintercept = 1.834528, linetype = "dashed", color = "gray40") +   
   ylab(NULL) +
   xlab(NULL) +
   theme_classic() +
@@ -663,31 +717,31 @@ e2<-ggplot(past_egg_summary, aes(x = DayMetFactor, y = total_fecundity, shape = 
     legend.text = ggtext::element_markdown(),
     legend.title = ggtext::element_markdown(),
     plot.title = ggtext::element_markdown(hjust = 0.5),
-    legend.position = c(.01, 1),
-    legend.justification = c("left", "top"),
-    legend.background = element_rect(fill = "white", color = "black", linewidth = 0.3)
+    legend.background = element_rect(fill = "white", color = "black", linewidth = 0.3),
+    legend.position = "none"     # This hides the legend
   ) +
-  labs(
-    shape = "Exposed to *A. monospora*",
-    title = "*P. ramosa*"   # <-- add this line
-  ) +
-  scale_x_discrete(drop = FALSE) +
+  labs(title = "*P. ramosa*") +
   scale_y_continuous(labels = scales::label_comma()) +
   scale_shape_manual(
     values = c(
       "ExposedUninfected" = 16,
-      "Unexposed" = 15), labels = c(
-        "ExposedUninfected" = "exposed but uninfected",
-        "Unexposed" = "unexposed")) + ylim(0,3)
+      "Unexposed" = 15
+    ),
+    labels = c(
+      "ExposedUninfected" = "exposed but uninfected",
+      "Unexposed" = "unexposed"
+    )
+  ) +
+  ylim(0, 3)
 
 #Creating the third graph for the egg facet plot 
 metsch_egg_summary <- clean_el.final_summary %>%
   filter(InfStatusFactor == "Metsch")
 
-e3 <-ggplot(metsch_egg_summary, aes(x = DayMetFactor, y = total_fecundity, shape = PastExpStatus)) +
-  geom_point(size = 4, position = position_dodge(width = 0.4), color = "tomato") +
+e3<-ggplot(metsch_egg_summary, aes(x = DayMetNum, y = total_fecundity, shape = PastExpStatus)) +
+  geom_point(size = 4, position = position_dodge(width = 1), color = "tomato") +
   geom_errorbar(aes(ymin = total_fecundity - se_fecundity, ymax = total_fecundity + se_fecundity), 
-                width = 0.1, position = position_dodge(width = 0.4), color = "tomato") +
+                width = 0.1, position = position_dodge(width = 1), color = "tomato") +
   ylab("Mean fecundity per host per day") +
   xlab("Day of exposure to *A. monospora*") +
   theme_classic() +
@@ -702,23 +756,23 @@ e3 <-ggplot(metsch_egg_summary, aes(x = DayMetFactor, y = total_fecundity, shape
     legend.background = element_rect(fill = "white", color = "black", linewidth = 0.3)
   ) +
   labs(
-    shape = "Exposed to *P. ramosa*",
-    title = "*A. monospora*"   # <-- add this line
+    shape = NULL,
+    title = "*A. monospora*"   
   ) +
-  scale_x_discrete(drop = FALSE) +
   scale_y_continuous(labels = scales::label_comma()) +
 scale_shape_manual(
   values = c(
     "ExposedUninfected" = 16,
     "Unexposed" = 15), labels = c(
-      "ExposedUninfected" = "exposed but uninfected",
-      "Unexposed" = "unexposed")) + ylim(0,3)
+      "ExposedUninfected" = "exposed to *P. ramosa* but uninfected",
+      "Unexposed" = "unexposed")) + ylim(0,3) +
+  geom_hline(yintercept = 1.834528, linetype = "dashed", color = "gray40")
 
 #Creating the fourth graph for the egg facet plot 
 coinf_egg_summary <- clean_el.final_summary %>%
   filter(InfStatusFactor == "Coinf")
 
-e4<-ggplot(coinf_egg_summary, aes(x = DayMetFactor, y = total_fecundity)) +
+e4<-ggplot(coinf_egg_summary, aes(x = DayMetNum, y = total_fecundity)) +
   geom_point(size = 4, position = position_dodge(width = 0.4), color = "#7f39d4") +
   geom_errorbar(aes(ymin = total_fecundity - se_fecundity, ymax = total_fecundity + se_fecundity), 
                 width = 0.1, position = position_dodge(width = 0.4), color = "#7f39d4") +
@@ -734,10 +788,11 @@ e4<-ggplot(coinf_egg_summary, aes(x = DayMetFactor, y = total_fecundity)) +
     legend.position = c(.01, 1),
     legend.justification = c("left", "top"),
     legend.background = element_rect(fill = "white", color = "black", linewidth = 0.3)
-  )  + scale_x_discrete(drop = FALSE) + scale_y_continuous(labels = scales::label_comma()) +
+  )  + scale_y_continuous(labels = scales::label_comma()) +
   labs(
-    title = "Coinfected"   # <-- add this line
-  ) + ylim(0,3)
+    title = "Coinfected"  
+  ) + ylim(0,3) + geom_hline(yintercept = 1.834528, linetype = "dashed", color = "gray40")
+
 
 eggplot<- (e1 | e2) / (e3 | e4) +
   plot_annotation(
@@ -758,7 +813,7 @@ ggsave("~/SequentialCoinfection/figures/eggplot.png", eggplot, dpi = 600, width 
 ##Survival 
 #Finding the mean lifetime fecundity for each treatment 
 survival_summary <- el.final %>%
-  group_by(DayMetFactor, InfStatusFactor, MetExpStatus, PastExpStatus) %>%
+  group_by(DayMetNum, InfStatusFactor, MetExpStatus, PastExpStatus) %>%
   summarise(
     n = n(),
     mean_survival = mean(lifesurvival, na.rm = TRUE),
@@ -768,23 +823,20 @@ survival_summary <- el.final %>%
 
 clean_survival_summary <- na.omit(survival_summary)
 
-levels(clean_survival_summary$DayMetFactor) <- 
-  sub("^0$", "never", levels(clean_survival_summary$DayMetFactor))
+#levels(clean_survival_summary$DayMetFactor) <- 
+#  sub("^0$", "never", levels(clean_survival_summary$DayMetFactor))
+
+#Drop never infected 
+clean_survival_summary<-subset(clean_survival_summary, !DayMetNum == "0")
 
 #Creating a facet plot based on terminal infection 
 uninf_survival_summary <- clean_survival_summary %>%
   filter(InfStatusFactor == "Uninf")
 
-s1<-ggplot(uninf_survival_summary, aes(x = DayMetFactor, y = mean_survival, color = MetExpStatus, shape = PastExpStatus)) +
-  geom_point(size = 4, position = position_dodge(width = 0.4)) +
+s1<-ggplot(uninf_survival_summary, aes(x = DayMetNum, y = mean_survival, shape = PastExpStatus)) +
+  geom_point(size = 4, position = position_dodge(width = 1.25), color = "green3") +
   geom_errorbar(aes(ymin = mean_survival - se_survival, ymax = mean_survival + se_survival), 
-                width = 0.1, position = position_dodge(width = 0.4)) +
-  scale_color_manual(
-    values = c(
-      "Unexposed" = "black",
-      "ExposedUninfected" = "green3"), labels = c(
-        "ExposedUninfected" = "exposed but uninfected",
-        "Unexposed" = "unexposed")) +
+                width = 0.1, position = position_dodge(width = 1.25), color = "green3") +
   ylab("Mean lifespan of host in days") +
   xlab(NULL) +
   theme_classic() +
@@ -794,28 +846,29 @@ s1<-ggplot(uninf_survival_summary, aes(x = DayMetFactor, y = mean_survival, colo
     legend.text = ggtext::element_markdown(),
     legend.title = ggtext::element_markdown(),
     plot.title = ggtext::element_markdown(hjust = 0.5),
-    legend.position = c(.01, .4),
+    legend.position = c(.01, 1),
     legend.justification = c("left", "top"),
     legend.background = element_rect(fill = "white", color = "black", linewidth = 0.3)
   ) +
   labs(
-    color = "Exposed to *A. monospora*",
-    shape = "Exposed to *P. ramosa*",
-    title = "Uninfected"   # <-- add this line
+    shape = NULL,
+    title = "Uninfected"  
   ) +
-  scale_x_discrete(drop = FALSE) +
-  scale_y_continuous(labels = scales::label_comma(), limits = c(0,75)) +
+  scale_y_continuous(labels = scales::label_comma(), limits = c(0,80)) +
   scale_shape_manual(
     values = c(
       "ExposedUninfected" = 16,
       "Unexposed" = 15), labels = c(
-        "ExposedUninfected" = "exposed but uninfected",
+        "ExposedUninfected" = "exposed to *P. ramosa* but uninfected",
         "Unexposed" = "unexposed"))
+
+#creating a reference line 
+mean(uninf_survival_summary$mean_survival)
 
 past_survival_summary <- clean_survival_summary %>%
   filter(InfStatusFactor == "Past")
 
-s2<-ggplot(past_survival_summary, aes(x = DayMetFactor, y = mean_survival, shape = MetExpStatus)) +
+s2<-ggplot(past_survival_summary, aes(x = DayMetNum, y = mean_survival, shape = MetExpStatus)) +
   geom_point(size = 4, position = position_dodge(width = 0.4), color = "cornflowerblue") +
   geom_errorbar(aes(ymin = mean_survival - se_survival, ymax = mean_survival + se_survival), 
                 width = 0.1, position = position_dodge(width = 0.4), color = "cornflowerblue") +
@@ -828,30 +881,29 @@ s2<-ggplot(past_survival_summary, aes(x = DayMetFactor, y = mean_survival, shape
     legend.text = ggtext::element_markdown(),
     legend.title = ggtext::element_markdown(),
     plot.title = ggtext::element_markdown(hjust = 0.5),
-    legend.position = c(.01, 1),
+    legend.position = "none",
     legend.justification = c("left", "top"),
     legend.background = element_rect(fill = "white", color = "black", linewidth = 0.3)
   ) +
   labs(
-    shape = "Exposed to *A. monospora*",
-    title = "*P. ramosa*"   # <-- add this line
+    shape = NULL,
+    title = "*P. ramosa*" 
   ) +
-  scale_x_discrete(drop = FALSE) +
-  scale_y_continuous(labels = scales::label_comma(), limits = c(0,75)) +
+  scale_y_continuous(labels = scales::label_comma(), limits = c(0,80)) +
   scale_shape_manual(
     values = c(
       "ExposedUninfected" = 16,
       "Unexposed" = 15), labels = c(
         "ExposedUninfected" = "exposed but uninfected",
-        "Unexposed" = "unexposed")) 
+        "Unexposed" = "unexposed")) + geom_hline(yintercept = 60.46355, linetype = "dashed", color = "gray40")
 
 metsch_survival_summary <- clean_survival_summary %>%
   filter(InfStatusFactor == "Metsch")
 
-s3<-ggplot(metsch_survival_summary, aes(x = DayMetFactor, y = mean_survival, shape = PastExpStatus)) +
-  geom_point(size = 4, position = position_dodge(width = 0.4), color = "tomato") +
+s3<-ggplot(metsch_survival_summary, aes(x = DayMetNum, y = mean_survival, shape = PastExpStatus)) +
+  geom_point(size = 4, position = position_dodge(width = 1.25), color = "tomato") +
   geom_errorbar(aes(ymin = mean_survival - se_survival, ymax = mean_survival + se_survival), 
-                width = 0.1, position = position_dodge(width = 0.4), color = "tomato") +
+                width = 0.1, position = position_dodge(width = 1.25), color = "tomato") +
   ylab("Mean lifespan of host in days") +
   xlab("Day of exposure to *A. monospora*") +
   theme_classic() +
@@ -861,27 +913,26 @@ s3<-ggplot(metsch_survival_summary, aes(x = DayMetFactor, y = mean_survival, sha
     legend.text = ggtext::element_markdown(),
     legend.title = ggtext::element_markdown(),
     plot.title = ggtext::element_markdown(hjust = 0.5),
-    legend.position = c(.01, 1),
+    legend.position = c(.01,1),
     legend.justification = c("left", "top"),
     legend.background = element_rect(fill = "white", color = "black", linewidth = 0.3)
   ) +
   labs(
-    shape = "Exposed to *P. ramosa*",
-    title = "*A. monospora*"   # <-- add this line
+    shape = NULL,
+    title = "*A. monospora*"   
   ) +
-  scale_x_discrete(drop = FALSE) +
-  scale_y_continuous(labels = scales::label_comma(), limits = c(0,75)) +
+  scale_y_continuous(labels = scales::label_comma(), limits = c(0,80)) +
   scale_shape_manual(
     values = c(
       "ExposedUninfected" = 16,
       "Unexposed" = 15), labels = c(
-        "ExposedUninfected" = "exposed but uninfected",
-        "Unexposed" = "unexposed"))
+        "ExposedUninfected" = "exposed to *P. ramosa* but uninfected",
+        "Unexposed" = "unexposed")) + geom_hline(yintercept = 60.46355, linetype = "dashed", color = "gray40")
 
 coinf_survival_summary <- clean_survival_summary %>%
   filter(InfStatusFactor == "Coinf")
 
-s4<-ggplot(coinf_survival_summary, aes(x = DayMetFactor, y = mean_survival)) +
+s4<-ggplot(coinf_survival_summary, aes(x = DayMetNum, y = mean_survival)) +
   geom_point(size = 4, position = position_dodge(width = 0.4), color = "#7f39d4") +
   geom_errorbar(aes(ymin = mean_survival - se_survival, ymax = mean_survival + se_survival), 
                 width = 0.1, position = position_dodge(width = 0.4), color = "#7f39d4") +
@@ -894,15 +945,14 @@ s4<-ggplot(coinf_survival_summary, aes(x = DayMetFactor, y = mean_survival)) +
     legend.text = ggtext::element_markdown(),
     legend.title = ggtext::element_markdown(),
     legend.position = c(.01, .4),
-    legend.justification = c("left", "top"),
+    legend.justification = "none",
     legend.background = element_rect(fill = "white", color = "black", linewidth = 0.3)
   ) +
   labs(
     title = "Coinfected"
   ) +
-  scale_x_discrete(drop = FALSE) +
-  scale_y_continuous(labels = scales::label_comma(), limits = c(0,75)) +
- theme(plot.title = element_text(hjust = 0.5))
+  scale_y_continuous(labels = scales::label_comma(), limits = c(0,80)) +
+ theme(plot.title = element_text(hjust = 0.5)) + geom_hline(yintercept = 60.46355, linetype = "dashed", color = "gray40")
 
 survplot <- (s1 | s2) / (s3 | s4) +
   plot_annotation(
@@ -936,7 +986,7 @@ el.final$survobject <- with(el.final, Surv(lifesurvival, censor))
 #summary(seq_lifespan)
 
 #Run Cox proportional hazards with interaction variables 
-cox.seqlifespan <- coxph(survobject ~ InfStatusFactor*DayMetFactor, data = el.final)
+cox.seqlifespan <- coxph(survobject ~ InfStatusFactor*DayMetNum, data = el.final) ###Change! 1/22/26
 summary(cox.seqlifespan)
 cox.test <- cox.zph(cox.seqlifespan)
 cox.test
@@ -1336,8 +1386,7 @@ overdisp_fun <- function(model) {
   c(chisq=Pearson.chisq,ratio=prat,rdf=rdf,p=pval)
 }
 
-#Does infection prevalence of past in coinfected treatments differ in comparison to control? NOTE: coinfected are NOT considered as 
-#having past in this model because apparently it creats a gingluarity? I thought singlarities were only in space? 
+#Does infection prevalence of past in coinfected treatments differ in comparison to control? 
 
 #past_only.glm <- glm(PastInfected_numeric ~ DayMetFactor, family = binomial, data = past)
 #summary(past_only.glm)
@@ -1380,11 +1429,10 @@ overdisp_fun <- function(model) {
 
 #past_coinfectednotpast.glm_simResid <- simulateResiduals(fittedModel = past_coinfectednotpast.glm)
 #plot(past_coinfectednotpast.glm)
+past2 <- subset(spores.numeric, TreatmentGroup %in% c("T2", "T3", "T4", "T5", "T6"))
+past2$PastInfected_numeric <- ifelse(past2$PastInfected == "Yes", 1, 0)
 
-#Avoid the singularity! 
-past$PastInfected_numeric[past$Coinfected == "Yes"] <- 0
-
-past_prevalence.glm <- glm(PastInfected_numeric ~ DayMetFactor+Coinfected, family = binomial, data = past)
+past_prevalence.glm <- glm(PastInfected_numeric ~ DayMetNum, family = binomial, data = past2)
 summary(past_prevalence.glm)
 
 overdisp_fun(past_prevalence.glm)
@@ -1398,18 +1446,16 @@ plot(past_prevalence.glm_simResid)
 past_prevalence_anova <- anova(past_prevalence.glm, test = "Chisq")
 past_prevalence_anova 
 
-#Now making a model for past and spore yield 
-#There is high variance leading to overdispersion
-mean(past_spores$Past.spore.in.animal)
-var(past_spores$Past.spore.in.animal)
+#Now making a model for past and spore yield
+past_spores_only <- subset(past2, PastInfected_numeric == "1")
 
-past_spores$PastInfected_numeric[past_spores$Coinfected == "Yes"] <- 0
-past_spores_only <- subset(past_spores, !Coinfected == "Yes")
+mean(past_spores_only$Past.spore.in.animal)
+var(past_spores_only$Past.spore.in.animal) #There is high variance leading to overdispersion
 
-past_spore.glm <- glm(Past.spore.in.animal ~ DayMetFactor*Coinfected, data = past_spores) ###NOT FINALIZED OUT OF 1/19/26
+#Past regardless of coinfection 
+past_spore.glm <- glmmTMB(Past.spore.in.animal ~ DayMetNum*Coinfected, family = nbinom1, data = past_spores) ###NOT FINALIZED OUT OF 1/19/26
 summary(past_spore.glm)
 
-#Michelle's overdispersion function shows this as being overdispersed but the second overdispersion test doesn't. 
 overdisp_fun(past_spore.glm)
 
 testDispersion(past_spore.glm)
@@ -1418,13 +1464,17 @@ testZeroInflation(past_spore.glm)
 past_spore.glm_simResid <- simulateResiduals(fittedModel = past_spore.glm)
 plot(past_spore.glm_simResid)
 
-past_spore_anova <- anova(past_spore.glm, test = "Chisq")
-past_spore_anova 
+emm_past_spore <- emmeans(
+  past_spore.glm,
+  ~ Coinfected | DayMetNum,
+  type = "response",  at = list(DayMetNum = c(5, 10, 15, 30)))
+
+summary(emm_past_spore)
+pairs(emm_past_spore)
+
+
 
 #Does infection prevalence of metsch in coinfected treatments differ in comparison to control (also adding in past exposure)?
-
-metsch_with_singlyexposed$MetschInfected_numeric[metsch_with_singlyexposed$Coinfected == "Yes"] <- 0
-
 metsch_prevalence.glm <- glm(MetschInfected_numeric ~ DayMetFactor+PastExposed, family = binomial, data = metsch_with_singlyexposed)
 summary(metsch_prevalence.glm)
 
@@ -1471,14 +1521,14 @@ emm_metsch_spores <- emmeans(
 summary(emm_metsch_spores)
 
 #Does the prevalence of coinfection change over time? 
-onlycoinfectiontreatments <- subset(spores.factor, TreatmentGroup %in% c("T3", "T4", "T5", "T6"))
+onlycoinfectiontreatments <- subset(spores.numeric, TreatmentGroup %in% c("T3", "T4", "T5", "T6"))
 levels(onlycoinfectiontreatments$Coinfected)[levels(onlycoinfectiontreatments$Coinfected) == "Yes"] <- "1"
 levels(onlycoinfectiontreatments$Coinfected)[levels(onlycoinfectiontreatments$Coinfected) == "No"] <- "0"
 
 hist(onlycoinfectiontreatments$Metsch.spore.in.animal)
 hist(onlycoinfectiontreatments$Past.spore.in.animal)
 
-onlycoinfectiontreatments.glm <- glm(Coinfected ~ DayMetFactor, family = binomial, data = onlycoinfectiontreatments)
+onlycoinfectiontreatments.glm <- glm(Coinfected ~ DayMetNum, family = binomial, data = onlycoinfectiontreatments)
 summary(onlycoinfectiontreatments.glm)
 
 overdisp_fun(onlycoinfectiontreatments.glm)

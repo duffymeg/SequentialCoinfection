@@ -1,4 +1,11 @@
-#Updated to work with GitHub on 1/19/26
+#Updated to work with GitHub on 1/26/26
+
+#Issues the code still has: 
+#Metsch spore analysis (line 1342) has both overdispersion and influential outliers. Log transforming helps with dispersion, but then we still have outliers. 
+#Lifespan is failing its proportional hazards assumption (line 1455)
+#Body size (line 1653) technically has problems, but the graphs look pretty good. However if we keep this model then nothing is signfiicant. 
+
+
 #Load libraries
 library(tidyverse)
 library(patchwork)
@@ -408,8 +415,8 @@ metsch_spores_summary$Coinfected <- factor(
   levels = c("No", "Yes"),
   labels = c("single infection", "coinfection"))
 
-#fig4_data <- metsch_spores_summary %>%
-#  filter(!(Coinfected == "single infection" & PastExpStatus == "exposed but uninfected"))
+fig4_data <- metsch_spores_summary %>%
+  filter(!(Coinfected == "single infection" & PastExpStatus == "exposed but uninfected"))
 
 fig4_data <- fig4_data %>%
   mutate(group = paste(Coinfected, PastExpStatus, sep = " | "))
@@ -969,169 +976,6 @@ survplot <- (s1 | s2) / (s3 | s4) +
 survplot
 ggsave("~/SequentialCoinfection/figures/survplot_test.png", survplot, dpi = 600, width = 15, height = 12, units = "in")
 
-#Survivor analysis - Hazard Ratio
-
-#subsetting for only infected
-#infected_el.final <- subset(el.final, !PastExpStatus == "ExposedUninfected")
-#infected_el.final <- subset(infected_el.final, !MetExpStatus == "ExposedUninfected")
-
-#censor animals that did not die
-#infected_el.final$survobject <- with(infected_el.final, Surv(lifesurvival, censor))
-#seq_lifespan <- survfit(survobject ~ InfStatusFactor, data = infected_el.final, conf.type = "log-log")
-#summary(seq_lifespan)
-
-#Censor animals who lived to the end 
-el.final$survobject <- with(el.final, Surv(lifesurvival, censor))
-#seq_lifespan <- survfit(survobject ~ InfStatusFactor, data = el.final, conf.type = "log-log")
-#summary(seq_lifespan)
-
-#Run Cox proportional hazards with interaction variables 
-cox.seqlifespan <- coxph(survobject ~ InfStatusFactor*DayMetNum, data = el.final) ###Change! 1/22/26
-summary(cox.seqlifespan)
-cox.test <- cox.zph(cox.seqlifespan)
-cox.test
-
-#I think this is showing that the hazards aren't exactly proportional across all times, but it should be fine? 
-#Cox is supposed to be fairly robust
-plot(cox.test)
-
-#Plot it out, not final plot 
-ggforest(cox.seqlifespan, data = el.final)
-
-# Get tidy model results (HRs, CIs, p-values, etc.)
-tidy_fit <- tidy(cox.seqlifespan, exponentiate = TRUE, conf.int = TRUE)
-
-# View all terms
-print(tidy_fit$term)
-
-#This can't be the fastest way but it is MY way
-subset_terms <- tidy_fit %>%
-  dplyr::filter(term %in% c(
-    "InfStatusFactorPast",
-    "InfStatusFactorMetsch", "InfStatusFactorCoinf", "DayMetFactor5", "DayMetFactor10", "DayMetFactor15",
-    "DayMetFactor30", "InfStatusFactorCoinf:DayMetFactor5", "InfStatusFactorCoinf:DayMetFactor10", "InfStatusFactorCoinf:DayMetFactor15",
-    "InfStatusFactorCoinf:DayMetFactor30"
-  ))
-
-#Reordering the terms and adding a p-value atericks column 
-subset_terms$term <- factor(tidy_fit$term, levels = c(
-  "InfStatusFactorPast",
-  "InfStatusFactorMetsch",
-  "InfStatusFactorCoinf",
-  "DayMetFactor5",
-  "DayMetFactor10",
-  "DayMetFactor15",
-  "DayMetFactor30",
-  "InfStatusFactorCoinf:DayMetFactor5",
-  "InfStatusFactorCoinf:DayMetFactor10",
-  "InfStatusFactorCoinf:DayMetFactor15",
-  "InfStatusFactorCoinf:DayMetFactor30"
-))
-
-#Dropping terms that have no data 
-subset_terms<- subset_terms %>%
-  filter(term != "InfStatusFactorCoinf:DayMetFactor30")
-
-subset_terms <- subset_terms |>
-  dplyr::mutate(sig_label = dplyr::case_when(
-    p.value < 0.001 ~ "***",
-    p.value < 0.01  ~ "**",
-    p.value < 0.05  ~ "*",
-    TRUE            ~ ""
-  ))
-
-#Making my forest plot, this gets a depreciation warning because I am not specifying orientation of bars, but the code is running fine currently  
-hazard<-ggplot(subset_terms, aes(y = fct_rev(term), x = estimate)) +
-  geom_point(size = 3) +
-  geom_errorbarh(aes(xmin = conf.low, xmax = conf.high), height = 0.2) +
-  geom_vline(xintercept = 1, linetype = "dashed") +
-  
-  # Adjusted text for log scale
-  geom_text(aes(
-    x = conf.high * 1.05,  # use multiplication for log scale
-    label = ifelse(p.value < 0.05,
-                   paste0(sig_label, "\n(p=", signif(p.value, 2), ")"),
-                   "")
-  ),
-  size = 3.5, hjust = 0, vjust = 0.5
-  ) +
-  
-  # Add annotations for interpretation
-  annotate("text", x = 0.7, y = Inf, label = "increased lifespan",
-           hjust = 1, vjust = 1.2, size = 4, fontface = "italic") +
-  annotate("text", x = 1.3, y = Inf, label = "decreased lifespan",
-           hjust = 0, vjust = 1.2, size = 4, fontface = "italic") +
-  
-  # Italic and custom y-axis labels
-  scale_y_discrete(labels = c(
-    "InfStatusFactorPast" = expression(italic("P. ramosa")),
-    "InfStatusFactorMetsch" = expression(italic("A. monospora")),
-    "InfStatusFactorCoinf" = "Coinfected",
-    "DayMetFactor5" = expression(italic("A. monospora") * " added on day 5"),
-    "DayMetFactor10" = expression(italic("A. monospora") * " added on day 10"),
-    "DayMetFactor15" = expression(italic("A. monospora") * " added on day 15"),
-    "DayMetFactor30" = expression(italic("A. monospora") * " added on day 30"),
-    "InfStatusFactorCoinf:DayMetFactor5" = expression("Coinfected: " * italic("A. monospora") * " added on day 5"),
-    "InfStatusFactorCoinf:DayMetFactor10" = expression("Coinfected: " * italic("A. monospora") * " added on day 10"),
-    "InfStatusFactorCoinf:DayMetFactor15" = expression("Coinfected: " * italic("A. monospora") * " added on day 15"),
-    "InfStatusFactorCoinf:DayMetFactor30" = expression("Coinfected: " * italic("A. monospora") * " added on day 30")
-  )) +
-  
-  # Log scale for x-axis with slight left expansion
-  scale_x_log10(
-    expand = expansion(mult = c(0.05, 0))
-  ) +
-  
-  labs(x = "Hazard Ratio (log scale)", y = NULL) +
-  theme_classic(base_size = 14)
-
-hazard
-
-ggsave("~/SequentialCoinfection/figures/el.final.survival.tiff", dpi = 600, width = 10.5, height = 6, units = "in", compression="lzw")
-ggsave("~/SequentialCoinfection/figures/el.final.survival.png", dpi = 600, width = 10.5, height = 6, units = "in")
-
-#Are coinfected and metsch lifespan different from each other? 
-cox.seqlifespan_nodaymet <- coxph(survobject ~ InfStatusFactor, data = el.final)
-summary(cox.seqlifespan_nodaymet)
-
-emm_cox <- emmeans(
-  cox.seqlifespan_nodaymet,
-  ~ InfStatusFactor,
-  type = "response"
-)
-
-pairs(emm_cox, adjust = "tukey") 
-
-#testing if coinfected and metsch are signficiantly different from each other
-#subset for just coinfected? 
-
-#el.final_justcoinf$survobject <- with(el.final_justcoinf, Surv(lifesurvival, censor))
-#seq_lifespan <- survfit(survobject ~ DayMetFactor, data = el.final_justcoinf, conf.type = "log-log")
-#summary(seq_lifespan)
-
-#cox.justcoinf <- coxph(survobject ~ DayMetFactor, data =el.final_justcoinf)
-#summary(cox.justcoinf)
-
-#Plot it out 
-#ggforest(cox.justcoinf, data = el.final_justcoinf)
-
-#ggsurvplot(seq_lifespan, data = el.final_justcoinf, xlab = "lifespan", facet.by = "DayMetFactor",
-#                                   conf.type = "log-log", conf.int = T, pval = TRUE,
-#                                   pval.method = TRUE)
-
-#Subset for just exposed but uninfected 
-#uninf <- subset(el.final, InfStatusFactor == "Uninf")
-
-#uninf$survobject <- with(uninf, Surv(lifesurvival, censor))
-#uninf_lifespan <- survfit(survobject ~ PastExposed + MetschExposed, data = uninf, conf.type = "log-log")
-#summary(uninf_lifespan)
-
-#cox.uninflifespan <- coxph(survobject ~ PastExposed * MetschExposed, data = uninf)
-#summary(cox.uninflifespan)
-#cox.test <- cox.zph(cox.uninflifespan)
-#cox.test
-#plot(cox.test)
-
 ##### Figure 5 ######
 #Body size analysis 
 #Read in the body size data.
@@ -1453,7 +1297,7 @@ mean(past_spores_only$Past.spore.in.animal)
 var(past_spores_only$Past.spore.in.animal) #There is high variance leading to overdispersion
 
 #Past regardless of coinfection 
-past_spore.glm <- glmmTMB(Past.spore.in.animal ~ DayMetNum*Coinfected, family = nbinom1, data = past_spores) ###NOT FINALIZED OUT OF 1/19/26
+past_spore.glm <- glmmTMB(Past.spore.in.animal ~ DayMetNum*Coinfected, family = nbinom1, data = past_spores)
 summary(past_spore.glm)
 
 overdisp_fun(past_spore.glm)
@@ -1472,10 +1316,8 @@ emm_past_spore <- emmeans(
 summary(emm_past_spore)
 pairs(emm_past_spore)
 
-
-
 #Does infection prevalence of metsch in coinfected treatments differ in comparison to control (also adding in past exposure)?
-metsch_prevalence.glm <- glm(MetschInfected_numeric ~ DayMetFactor+PastExposed, family = binomial, data = metsch_with_singlyexposed)
+metsch_prevalence.glm <- glm(MetschInfected_numeric ~ DayMetNum*PastExposed, family = binomial, data = metsch_with_singlyexposed)
 summary(metsch_prevalence.glm)
 
 overdisp_fun(metsch_prevalence.glm)
@@ -1489,18 +1331,18 @@ plot(metsch_prevalence.glm_simResid)
 #Adding post-hoc for past exposure 
 emm_metsch_prevalence <- emmeans(
   metsch_prevalence.glm,
-  ~ PastExposed + DayMetFactor,
-  type = "response"
-)
+  ~ PastExposed + DayMetNum,
+  type = "response", at = list(DayMetNum = c(5, 10, 15, 30)))
 
 summary(emm_metsch_prevalence)
+pairs(emm_metsch_prevalence, by = "DayMetNum")
 
 #Metsch spores analysis
-metsch_spores$MetschInfected_numeric[metsch_spores$Coinfected == "Yes"] <- 0
-metsch_spore.glm <- glm(Metsch.spore.in.animal ~ DayMetFactor * Coinfected + PastExposed, family = gaussian, data = metsch_spores) ###Not finalized as of 1/19/26
+metsch_spores$ln_met_spores <- log(metsch_spores$Metsch.spore.in.animal)
+metsch_spore.glm <- glmmTMB(ln_met_spores ~ DayMetNum * Coinfected + PastExposed, family = gaussian, data = metsch_spores) 
 summary(metsch_spore.glm)
 
-overdisp_fun(metsch_spore.glm)
+overdisp_fun(metsch_spore.glm) #log transform can fix overdispersion, but influential outliers are still present 
 
 testDispersion(metsch_spore.glm)
 testZeroInflation(metsch_spore.glm)
@@ -1508,17 +1350,25 @@ testZeroInflation(metsch_spore.glm)
 metsch_spore.glm_simResid <- simulateResiduals(fittedModel = metsch_spore.glm)
 plot(metsch_spore.glm_simResid)
 
-metsch_spore_anova <- anova(metsch_spore.glm, test = "Chisq")
-metsch_spore_anova 
+metsch_spore2.glm <- glmmTMB(Metsch.spore.in.animal ~ DayMetNum * Coinfected + PastExposed, family = nbinom1(), data = metsch_spores) 
+summary(metsch_spore2.glm)
+
+overdisp_fun(metsch_spore2.glm)
+
+testDispersion(metsch_spore2.glm)
+testZeroInflation(metsch_spore2.glm)
+
+metsch_spore.glm2_simResid <- simulateResiduals(fittedModel = metsch_spore2.glm)
+plot(metsch_spore.glm2_simResid)
 
 #Adding post-hoc for past exposure 
 emm_metsch_spores <- emmeans(
   metsch_spore.glm,
-  ~ PastExposed + DayMetFactor * Coinfected,
-  type = "response"
-)
+  ~ PastExposed + DayMetNum * Coinfected,
+  type = "response", at = list(DayMetNum = c(5, 10, 15, 30)))
 
 summary(emm_metsch_spores)
+pairs(emm_metsch_spores, by = "DayMetNum")
 
 #Does the prevalence of coinfection change over time? 
 onlycoinfectiontreatments <- subset(spores.numeric, TreatmentGroup %in% c("T3", "T4", "T5", "T6"))
@@ -1569,9 +1419,12 @@ coinf_anova
 #)
 
 #summary(emm_coinf_past_spores)
+
 #Moving on to fecundity
 #Fecundity model 
-totalegg.glm <- glmmTMB(egg_per_day ~ InfStatusFactor * DayMetFactor, family = gaussian, data = el.final)
+el.final <- na.omit(el.final) #dropping the five hosts that had egg data, but did not have spore yield to confirm infection status
+
+totalegg.glm <- glmmTMB(egg_per_day ~ InfStatusFactor * DayMetNum, family = gaussian, data = el.final)
 summary(totalegg.glm)
 
 testDispersion(totalegg.glm)
@@ -1579,15 +1432,164 @@ testZeroInflation(totalegg.glm)
 
 totalegg.glm_simResid <- simulateResiduals(fittedModel = totalegg.glm)
 plot(totalegg.glm_simResid) # there are some patterns in the residual, but this is the best model 
+testOutliers(totalegg.glm_simResid)
 
-emm_egg <- emmeans(totalegg.glm, ~ DayMetFactor * InfStatusFactor) 
-summary(emm_egg)
+#Lifespan analysis 
+#Survivor analysis - Hazard Ratio
 
-#totalegg.glm.df <- emmeans(totalegg.glm, specs = pairwise ~ InfStatusFactor | DayMetFactor | lifesurvival, type = "response")
-#totalegg.glm.df
-#coinfmetspores.emm.df <- as.data.frame(coinfmetspores.glm.df$emmeans)
+#subsetting for only infected
+#infected_el.final <- subset(el.final, !PastExpStatus == "ExposedUninfected")
+#infected_el.final <- subset(infected_el.final, !MetExpStatus == "ExposedUninfected")
 
-plot(emm_egg)
+#censor animals that did not die
+#infected_el.final$survobject <- with(infected_el.final, Surv(lifesurvival, censor))
+#seq_lifespan <- survfit(survobject ~ InfStatusFactor, data = infected_el.final, conf.type = "log-log")
+#summary(seq_lifespan)
+
+#Censor animals who lived to the end 
+el.final$survobject <- with(el.final, Surv(lifesurvival, censor))
+seq_lifespan <- survfit(survobject ~ InfStatusFactor, data = el.final, conf.type = "log-log")
+summary(seq_lifespan)
+
+#Run Cox proportional hazards with interaction variables 
+cox_model <- coxph(survobject ~ InfStatusFactor*DayMetNum, robust = TRUE, data = el.final)
+summary(cox_model)
+cox.test <- cox.zph(cox_model) # Hazards are not proportional 
+cox.test
+
+#I think this is showing that the hazards aren't exactly proportional across all times, but it should be fine? 
+#Cox is supposed to be fairly robust
+plot(cox.test)
+
+#Plot it out, not final plot 
+#ggforest(cox.seqlifespan, data = el.final)
+
+# Get tidy model results (HRs, CIs, p-values, etc.)
+#tidy_fit <- tidy(cox.seqlifespan, exponentiate = TRUE, conf.int = TRUE)
+
+# View all terms
+#print(tidy_fit$term)
+
+
+
+#This can't be the fastest way but it is MY way
+#subset_terms <- tidy_fit %>%
+#  dplyr::filter(term %in% c(
+#    "InfStatusFactorPast",
+#    "InfStatusFactorMetsch", "InfStatusFactorCoinf", "DayMetFactor5", "DayMetFactor10", "DayMetFactor15",
+#    "DayMetFactor30", "InfStatusFactorCoinf:DayMetFactor5", "InfStatusFactorCoinf:DayMetFactor10", "InfStatusFactorCoinf:DayMetFactor15",
+#    "InfStatusFactorCoinf:DayMetFactor30"
+#  ))
+
+#Reordering the terms and adding a p-value atericks column 
+#subset_terms$term <- factor(tidy_fit$term, levels = c(
+#  "InfStatusFactorPast",
+#  "InfStatusFactorMetsch",
+#  "InfStatusFactorCoinf",
+#  "DayMetFactor5",
+#  "DayMetFactor10",
+#  "DayMetFactor15",
+#  "DayMetFactor30",
+#  "InfStatusFactorCoinf:DayMetFactor5",
+#  "InfStatusFactorCoinf:DayMetFactor10",
+#  "InfStatusFactorCoinf:DayMetFactor15",
+#  "InfStatusFactorCoinf:DayMetFactor30"
+#))
+
+#Dropping terms that have no data 
+#subset_terms<- subset_terms %>%
+#  filter(term != "InfStatusFactorCoinf:DayMetFactor30")
+
+#subset_terms <- subset_terms |>
+#  dplyr::mutate(sig_label = dplyr::case_when(
+#    p.value < 0.001 ~ "***",
+#    p.value < 0.01  ~ "**",
+#    p.value < 0.05  ~ "*",
+#    TRUE            ~ ""
+#  ))
+
+#Making my forest plot, this gets a depreciation warning because I am not specifying orientation of bars, but the code is running fine currently  
+#hazard<-ggplot(subset_terms, aes(y = fct_rev(term), x = estimate)) +
+#  geom_point(size = 3) +
+#  geom_errorbarh(aes(xmin = conf.low, xmax = conf.high), height = 0.2) +
+#  geom_vline(xintercept = 1, linetype = "dashed") +
+
+# Adjusted text for log scale
+#  geom_text(aes(
+#    x = conf.high * 1.05,  # use multiplication for log scale
+#    label = ifelse(p.value < 0.05,
+#                   paste0(sig_label, "\n(p=", signif(p.value, 2), ")"),
+#                   "")
+#  ),
+#  size = 3.5, hjust = 0, vjust = 0.5
+#  ) +
+# Add annotations for interpretation
+#  annotate("text", x = 0.7, y = Inf, label = "increased lifespan",
+#           hjust = 1, vjust = 1.2, size = 4, fontface = "italic") +
+#  annotate("text", x = 1.3, y = Inf, label = "decreased lifespan",
+#           hjust = 0, vjust = 1.2, size = 4, fontface = "italic") +
+
+# Italic and custom y-axis labels
+#  scale_y_discrete(labels = c(
+#    "InfStatusFactorPast" = expression(italic("P. ramosa")),
+#    "InfStatusFactorMetsch" = expression(italic("A. monospora")),
+#    "InfStatusFactorCoinf" = "Coinfected",
+#    "DayMetFactor5" = expression(italic("A. monospora") * " added on day 5"),
+#    "DayMetFactor10" = expression(italic("A. monospora") * " added on day 10"),
+#    "DayMetFactor15" = expression(italic("A. monospora") * " added on day 15"),
+#    "DayMetFactor30" = expression(italic("A. monospora") * " added on day 30"),
+#    "InfStatusFactorCoinf:DayMetFactor5" = expression("Coinfected: " * italic("A. monospora") * " added on day 5"),
+#    "InfStatusFactorCoinf:DayMetFactor10" = expression("Coinfected: " * italic("A. monospora") * " added on day 10"),
+#    "InfStatusFactorCoinf:DayMetFactor15" = expression("Coinfected: " * italic("A. monospora") * " added on day 15"),
+#    "InfStatusFactorCoinf:DayMetFactor30" = expression("Coinfected: " * italic("A. monospora") * " added on day 30")
+#  )) +
+
+# Log scale for x-axis with slight left expansion
+#  scale_x_log10(
+#    expand = expansion(mult = c(0.05, 0))
+#  ) +
+
+#  labs(x = "Hazard Ratio (log scale)", y = NULL) +
+#  theme_classic(base_size = 14)
+
+#hazard
+
+#ggsave("~/SequentialCoinfection/figures/el.final.survival.tiff", dpi = 600, width = 10.5, height = 6, units = "in", compression="lzw")
+#ggsave("~/SequentialCoinfection/figures/el.final.survival.png", dpi = 600, width = 10.5, height = 6, units = "in")
+
+#Are coinfected and metsch lifespan different from each other? 
+#cox.seqlifespan_nodaymet <- coxph(survobject ~ InfStatusFactor, data = el.final)
+#summary(cox.seqlifespan_nodaymet)
+
+#testing if coinfected and metsch are signficiantly different from each other
+#subset for just coinfected? 
+
+#el.final_justcoinf$survobject <- with(el.final_justcoinf, Surv(lifesurvival, censor))
+#seq_lifespan <- survfit(survobject ~ DayMetFactor, data = el.final_justcoinf, conf.type = "log-log")
+#summary(seq_lifespan)
+
+#cox.justcoinf <- coxph(survobject ~ DayMetFactor, data =el.final_justcoinf)
+#summary(cox.justcoinf)
+
+#Plot it out 
+#ggforest(cox.justcoinf, data = el.final_justcoinf)
+
+#ggsurvplot(seq_lifespan, data = el.final_justcoinf, xlab = "lifespan", facet.by = "DayMetFactor",
+#                                   conf.type = "log-log", conf.int = T, pval = TRUE,
+#                                   pval.method = TRUE)
+
+#Subset for just exposed but uninfected 
+#uninf <- subset(el.final, InfStatusFactor == "Uninf")
+
+#uninf$survobject <- with(uninf, Surv(lifesurvival, censor))
+#uninf_lifespan <- survfit(survobject ~ PastExposed + MetschExposed, data = uninf, conf.type = "log-log")
+#summary(uninf_lifespan)
+
+#cox.uninflifespan <- coxph(survobject ~ PastExposed * MetschExposed, data = uninf)
+#summary(cox.uninflifespan)
+#cox.test <- cox.zph(cox.uninflifespan)
+#cox.test
+#plot(cox.test)
 
 #What's is up with the 30 day metsch? 
 #justmetsch <- subset(spores.factor, TreatmentGroup %in% c("T7" ,"T8", "T9", "T10"))
@@ -1649,16 +1651,40 @@ plot(emm_egg)
 #modelmix6 <- lmer(transformedbody ~ days_diff + days_since_metsch_exposure + Terminal.infection + (1 | uniqueident), data = long.data) 
 
 #Testing body size
-modelmix7 <- lmer(transformedbody ~ time * DayMet * Terminal.infection + (1 | uniqueident), data = long.data) 
+long.data$DayMetNum <- as.character(long.data$DayMet)
+long.data$DayMetNum[long.data$DayMetNum == "None"] <- "0"
+long.data$DayMetNum <- as.numeric(long.data$DayMetNum)
 
-summary(modelmix7)
-plot(modelmix7)
 
-modelmix7_simResid <- simulateResiduals(fittedModel = modelmix7)
+long.data <- long.data %>%
+  mutate(exposure_status = case_when(
+    TreatmentGroup == "T1" ~ "none",
+    TreatmentGroup == "T2" ~ "past_exposed",
+    TreatmentGroup %in% c("T3", "T4", "T5", "T6") ~ "coexposed",
+    TreatmentGroup %in% c("T7", "T8", "T9", "T10") ~ "metsch_exposed",
+    TRUE ~ NA_character_  # default for any other value
+  ))
+long.data$exposure_status <- as.factor(long.data$exposure_status)
+long.data$exposure_status<-relevel(long.data$exposure_status, "none")
+
+#modelmix7 <- lmer(transformedbody ~ time * DayMetNum * Terminal.infection + Coexposed + (1 | uniqueident), data = long.data) 
+
+modelmix7_het <- glmmTMB(
+  transformedbody ~ time + DayMetNum * Terminal.infection * exposure_status + (1 | uniqueident),
+  dispformula = ~ poly(time, 2),
+  data = long.data
+)
+summary(modelmix7_het) #Even though the residual tests fail, the graphs don't look bad. However only time is a significant term 
+
+modelmix7_simResid <- simulateResiduals(fittedModel = modelmix7_het)
 plot(modelmix7_simResid)
+testOutliers(modelmix7_het)
+testUniformity(modelmix7_het)
 
-testDispersion(modelmix7)
-testZeroInflation(modelmix7)
+testDispersion(modelmix7_het)
+testZeroInflation(modelmix7_het)
+
+ Anova(modelmix7_het, type = "II")
 
 #Need to keep terminal infection even though nothing is significant 
 #modelmix5 <- lmer(transformedbody ~ days_diff * days_since_metsch_exposure + (1 | uniqueident), data = long.data) 

@@ -9,47 +9,17 @@
 #Load libraries
 library(tidyverse)
 library(patchwork)
-library(forcats)
-library(car)
-library(emmeans)
-
-library(ggeffects)
-library(reshape2)
-library(Rcpp)
-library(DHARMa)
-library(colorspace)
-library(ggpubr)
-library(lme4)
-library(TMB)
-library(glmmTMB)
-library(performance)
-library(dplyr)
-library(parsedate)
-library(here)
 library(ggtext)
-library(scales)
-library(dplyr)
-library(ggplot2)
-library(FSA)
-library(nlstools)
-library(plotrix)
-library(Matrix)
-library(tidyr)
-library(lmerTest)
-library(survival)
-library(survminer)
-library(ggsurvfit)
-library(survivalAnalysis)
-library(broom)
-library(forestmodel)
-library(knitr)
-library(kableExtra)
-library(flextable)
-library(modelsummary)
+library(here)
+library(reshape2)
 
-#set working directory to work within GitHub
-setwd("~/SequentialCoinfection/data")
-total.spores <- read.csv("Coinfection Total Spore Yield Data.csv")
+
+
+# Tell R where files are stored
+here::i_am("scripts/sequential_coinfection_2024.R")
+
+# Load spore data
+total.spores <- read.csv("data/Coinfection Total Spore Yield Data.csv")
 View(total.spores)
 
 #Replace the #DIV/0! with NA for the cells that contain that value
@@ -512,12 +482,12 @@ infectionplot <-
   )
 
 infectionplot
-ggsave("~/SequentialCoinfection/figures/infectionplot_withexposurelabels.png", infectionplot, dpi = 600, width = 15, height = 12, units = "in")
+ggsave("figures/infectionplot_withexposurelabels.png", infectionplot, dpi = 600, width = 15, height = 12, units = "in")
 
 
 ###Creating figure 3####
 #FECUNDITY ANALYSIS
-egg <- read.csv("Coinfection Egg Data.csv")
+egg <- read.csv("data/Coinfection Egg Data.csv")
 View(egg)
 
 #Add column that totals lifetime reproductive output for each individual
@@ -814,7 +784,7 @@ eggplot<- (e1 | e2) / (e3 | e4) +
     strip.text = element_text(size = 18)
   )
 eggplot
-ggsave("~/SequentialCoinfection/figures/eggplot.png", eggplot, dpi = 600, width = 15, height = 12, units = "in")
+ggsave("figures/eggplot.png", eggplot, dpi = 600, width = 15, height = 12, units = "in")
 
 ####CREATING FIGURE 4#####
 ##Survival 
@@ -974,12 +944,12 @@ survplot <- (s1 | s2) / (s3 | s4) +
     strip.text = element_text(size = 18)
   )
 survplot
-ggsave("~/SequentialCoinfection/figures/survplot_test.png", survplot, dpi = 600, width = 15, height = 12, units = "in")
+ggsave("figures/survplot_test.png", survplot, dpi = 600, width = 15, height = 12, units = "in")
 
 ##### Figure 5 ######
 #Body size analysis 
 #Read in the body size data.
-length <- read.csv("Coinfection Body Size_without_continous.csv")
+length <- read.csv("data/Coinfection Body Size_without_continous.csv")
 
 length[c('TreatmentGroup', 'Rep')] <- str_split_fixed(length$sample.ID, '-', 2)
 length$TreatmentGroup < - as.factor(length$TreatmentGroup)
@@ -1215,7 +1185,51 @@ bodysize <- (l1 | l2) / (l3 | l_blank)+
   )
 
 bodysize
-ggsave("~/SequentialCoinfection/figures/bodysize.png", bodysize, dpi = 600, width = 15, height = 12, units = "in")
+ggsave("figures/bodysize.png", bodysize, dpi = 600, width = 15, height = 12, units = "in")
+
+
+## Code above here all checked and runs using just the libraries at the top. Pasting the additional libraries
+## from earlier code here -- will figure out which are needed and then remove the rest
+
+# not yet loading any of the libraries below this -- trying to figure out which are actually needed
+library(forcats)
+library(car)
+library(emmeans)
+library(ggeffects)
+library(Rcpp)
+library(DHARMa)
+library(colorspace)
+library(ggpubr)
+library(lme4)
+library(TMB)
+library(glmmTMB)
+library(performance)
+library(dplyr)
+library(parsedate)
+library(scales)
+library(dplyr)
+library(ggplot2)
+library(FSA)
+library(nlstools)
+library(plotrix)
+library(Matrix)
+library(tidyr)
+library(lmerTest)
+library(survival)
+library(survminer)
+library(ggsurvfit)
+library(survivalAnalysis)
+library(broom)
+library(forestmodel)
+library(knitr)
+library(kableExtra)
+library(flextable)
+library(modelsummary)
+
+
+
+
+
 
 ####Figure 6######
 ####All of the models  for this paper

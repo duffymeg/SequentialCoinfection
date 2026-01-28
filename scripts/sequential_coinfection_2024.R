@@ -1188,46 +1188,14 @@ bodysize
 ggsave("figures/bodysize.png", bodysize, dpi = 600, width = 15, height = 12, units = "in")
 
 
+## Libraries used in analysis get loaded here
+library(performance)
+library(DHARMa)
+library(glmmTMB)
+library(emmeans)
+
 ## Code above here all checked and runs using just the libraries at the top. Pasting the additional libraries
 ## from earlier code here -- will figure out which are needed and then remove the rest
-
-# not yet loading any of the libraries below this -- trying to figure out which are actually needed
-library(forcats)
-library(car)
-library(emmeans)
-library(ggeffects)
-library(Rcpp)
-library(DHARMa)
-library(colorspace)
-library(ggpubr)
-library(lme4)
-library(TMB)
-library(glmmTMB)
-library(performance)
-library(dplyr)
-library(parsedate)
-library(scales)
-library(dplyr)
-library(ggplot2)
-library(FSA)
-library(nlstools)
-library(plotrix)
-library(Matrix)
-library(tidyr)
-library(lmerTest)
-library(survival)
-library(survminer)
-library(ggsurvfit)
-library(survivalAnalysis)
-library(broom)
-library(forestmodel)
-library(knitr)
-library(kableExtra)
-library(flextable)
-library(modelsummary)
-
-
-
 
 
 
@@ -1295,6 +1263,7 @@ summary(past_prevalence.glm)
 
 overdisp_fun(past_prevalence.glm)
 
+
 testDispersion(past_prevalence.glm)
 testZeroInflation(past_prevalence.glm)
 
@@ -1356,7 +1325,7 @@ metsch_spores$ln_met_spores <- log(metsch_spores$Metsch.spore.in.animal)
 metsch_spore.glm <- glmmTMB(ln_met_spores ~ DayMetNum * Coinfected + PastExposed, family = gaussian, data = metsch_spores) 
 summary(metsch_spore.glm)
 
-overdisp_fun(metsch_spore.glm) #log transform can fix overdispersion, but influential outliers are still present 
+overdisp_fun(metsch_spore.glm) #log transform can fix overdispersion but still influential outliers
 
 testDispersion(metsch_spore.glm)
 testZeroInflation(metsch_spore.glm)
@@ -1370,6 +1339,7 @@ summary(metsch_spore2.glm)
 overdisp_fun(metsch_spore2.glm)
 
 testDispersion(metsch_spore2.glm)
+# Underdispersed
 testZeroInflation(metsch_spore2.glm)
 
 metsch_spore.glm2_simResid <- simulateResiduals(fittedModel = metsch_spore2.glm)
@@ -1466,14 +1436,14 @@ seq_lifespan <- survfit(survobject ~ InfStatusFactor, data = el.final, conf.type
 summary(seq_lifespan)
 
 #Run Cox proportional hazards with interaction variables 
-cox_model <- coxph(survobject ~ InfStatusFactor*DayMetNum, robust = TRUE, data = el.final)
-summary(cox_model)
-cox.test <- cox.zph(cox_model) # Hazards are not proportional 
-cox.test
+# cox_model <- coxph(survobject ~ InfStatusFactor*DayMetNum, robust = TRUE, data = el.final)
+# summary(cox_model)
+# cox.test <- cox.zph(cox_model) # Hazards are not proportional 
+# cox.test
 
 #I think this is showing that the hazards aren't exactly proportional across all times, but it should be fine? 
 #Cox is supposed to be fairly robust
-plot(cox.test)
+# plot(cox.test)
 
 #Plot it out, not final plot 
 #ggforest(cox.seqlifespan, data = el.final)
@@ -1663,6 +1633,7 @@ plot(cox.test)
 #plot(modelmix4_interaction_simResid)
 
 #modelmix6 <- lmer(transformedbody ~ days_diff + days_since_metsch_exposure + Terminal.infection + (1 | uniqueident), data = long.data) 
+
 
 #Testing body size
 long.data$DayMetNum <- as.character(long.data$DayMet)

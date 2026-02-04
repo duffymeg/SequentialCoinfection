@@ -1,9 +1,9 @@
-#Updated to work with GitHub on 1/26/26
+#Updated to work with GitHub on 2/04/26
 
 #Issues the code still has: 
-#Metsch spore analysis (line 1342) has both overdispersion and influential outliers. Log transforming helps with dispersion, but then we still have outliers. 
-#Lifespan is failing its proportional hazards assumption (line 1455)
-#Body size (line 1653) technically has problems, but the graphs look pretty good. However if we keep this model then nothing is signfiicant. 
+#Lifespan is failing its proportional hazards assumption (line 1455), added a glm analysis but still has issues
+#Body size (line 1653) technically has problems, but the graphs look pretty good. However if we keep this model then nothing is signfiicant.
+#Added body size models that split the terms, but still nothing is significant. 
 
 
 #Load libraries
@@ -12,6 +12,7 @@ library(patchwork)
 library(ggtext)
 library(here)
 library(reshape2)
+library(survival)
 
 # Tell R where files are stored
 here::i_am("scripts/sequential_coinfection_2024.R")
@@ -1191,6 +1192,7 @@ library(performance)
 library(DHARMa)
 library(glmmTMB)
 library(emmeans)
+library(car)
 
 ## Code above here all checked and runs using just the libraries at the top. Pasting the additional libraries
 ## from earlier code here -- will figure out which are needed and then remove the rest
@@ -1463,10 +1465,21 @@ seq_lifespan <- survfit(survobject ~ InfStatusFactor, data = el.final, conf.type
 summary(seq_lifespan)
 
 #Run Cox proportional hazards with interaction variables 
-# cox_model <- coxph(survobject ~ InfStatusFactor*DayMetNum, robust = TRUE, data = el.final)
-# summary(cox_model)
-# cox.test <- cox.zph(cox_model) # Hazards are not proportional 
-# cox.test
+cox_model <- coxph(survobject ~ InfStatusFactor*DayMetNum, robust = TRUE, data = el.final)
+summary(cox_model)
+cox.test <- cox.zph(cox_model) # Hazards are not proportional 
+cox.test
+
+el.final_died <- subset(el.final, !censor == "1")
+lifespan.glm <- glmmTMB(lifesurvival ~ InfStatusFactor*DayMetNum, family = gaussian, data = el.final_died)
+summary(lifespan.glm)
+
+testDispersion(lifespan.glm)
+testZeroInflation(lifespan.glm)
+
+lifespan.glm_simResid <- simulateResiduals(fittedModel = lifespan.glm)
+plot(lifespan.glm_simResid) 
+testOutliers(lifespan.glm_simResid) #outliers are driving model issues 
 
 #I think this is showing that the hazards aren't exactly proportional across all times, but it should be fine? 
 #Cox is supposed to be fairly robust
@@ -1661,7 +1674,6 @@ summary(seq_lifespan)
 
 #modelmix6 <- lmer(transformedbody ~ days_diff + days_since_metsch_exposure + Terminal.infection + (1 | uniqueident), data = long.data) 
 
-
 #Testing body size
 long.data$DayMetNum <- as.character(long.data$DayMet)
 long.data$DayMetNum[long.data$DayMetNum == "None"] <- "0"
@@ -1696,7 +1708,65 @@ testUniformity(modelmix7_het)
 testDispersion(modelmix7_het)
 testZeroInflation(modelmix7_het)
 
- Anova(modelmix7_het, type = "II")
+Anova(modelmix7_het, type = "II")
+
+#breaking up model into smaller model
+#This one deals with exposure but remaining uninfected 
+long.data_uninf <- subset(long.data, Terminal.infection == "none")
+  
+modelmix8 <- glmmTMB(
+  transformedbody ~ time + exposure_status + (1 | uniqueident),
+  dispformula = ~ poly(time, 2),
+  data = long.data_uninf
+)
+
+summary(modelmix8) 
+
+modelmix8_simResid <- simulateResiduals(fittedModel = modelmix8)
+plot(modelmix8_simResid) #while it says signficant, the lines look fine 
+testOutliers(modelmix8)
+
+testDispersion(modelmix8)
+testZeroInflation(modelmix8)
+
+Anova(modelmix8, type = "II")
+
+#this one deals with terminal infection, these residuals looks work and past should probably be significant? 
+modelmix9 <- glmmTMB(
+  transformedbody ~ time + Terminal.infection + (1 | uniqueident),
+  dispformula = ~ poly(time, 2),
+  data = long.data)
+
+summary(modelmix9) 
+
+modelmix9_simResid <- simulateResiduals(fittedModel = modelmix9)
+plot(modelmix9_simResid) 
+testOutliers(modelmix9)
+
+testDispersion(modelmix9)
+testZeroInflation(modelmix9)
+
+Anova(modelmix9, type = "II")
+
+#this one deals with just coinfected 
+long.data_co <- subset(long.data, Terminal.infection == "coinfected")
+
+modelmix10 <- glmmTMB(
+  transformedbody ~ time + DayMet + (1 | uniqueident), #this is using Day of metsch exposure as a factor 
+  dispformula = ~ poly(time, 2),
+  data = long.data_co
+)
+
+summary(modelmix10) 
+
+modelmix10_simResid <- simulateResiduals(fittedModel = modelmix10)
+plot(modelmix10_simResid) #while it says signficant, the lines look fine 
+testOutliers(modelmix10)
+
+testDispersion(modelmix10)
+testZeroInflation(modelmix10)
+
+Anova(modelmix8, type = "II")
 
 #Need to keep terminal infection even though nothing is significant 
 #modelmix5 <- lmer(transformedbody ~ days_diff * days_since_metsch_exposure + (1 | uniqueident), data = long.data) 

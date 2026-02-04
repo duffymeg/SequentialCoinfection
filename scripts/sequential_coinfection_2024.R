@@ -13,8 +13,6 @@ library(ggtext)
 library(here)
 library(reshape2)
 
-
-
 # Tell R where files are stored
 here::i_am("scripts/sequential_coinfection_2024.R")
 
@@ -1263,7 +1261,6 @@ summary(past_prevalence.glm)
 
 overdisp_fun(past_prevalence.glm)
 
-
 testDispersion(past_prevalence.glm)
 testZeroInflation(past_prevalence.glm)
 
@@ -1321,11 +1318,11 @@ summary(emm_metsch_prevalence)
 pairs(emm_metsch_prevalence, by = "DayMetNum")
 
 #Metsch spores analysis
-metsch_spores$ln_met_spores <- log(metsch_spores$Metsch.spore.in.animal)
-metsch_spore.glm <- glmmTMB(ln_met_spores ~ DayMetNum * Coinfected + PastExposed, family = gaussian, data = metsch_spores) 
+#metsch_spores$ln_met_spores <- log(metsch_spores$Metsch.spore.in.animal)
+metsch_spore.glm <- glmmTMB(Metsch.spore.in.animal ~ DayMetNum + Coinfected + PastExposed + Past.spore.in.animal, family = gaussian, data = metsch_spores) 
 summary(metsch_spore.glm)
 
-overdisp_fun(metsch_spore.glm) #log transform can fix overdispersion but still influential outliers
+overdisp_fun(metsch_spore.glm) #
 
 testDispersion(metsch_spore.glm)
 testZeroInflation(metsch_spore.glm)
@@ -1333,26 +1330,56 @@ testZeroInflation(metsch_spore.glm)
 metsch_spore.glm_simResid <- simulateResiduals(fittedModel = metsch_spore.glm)
 plot(metsch_spore.glm_simResid)
 
-metsch_spore2.glm <- glmmTMB(Metsch.spore.in.animal ~ DayMetNum * Coinfected + PastExposed, family = nbinom1(), data = metsch_spores) 
-summary(metsch_spore2.glm)
+#Day Metsch as factor 
+metsch_spores$DayMetFac <- as.factor(metsch_spores$DayMetNum)
+metsch_spore.glm2 <- glmmTMB(Metsch.spore.in.animal ~ DayMetFac + Coinfected + PastExposed + Past.spore.in.animal, family = gaussian, data = metsch_spores) 
+summary(metsch_spore.glm2)
 
-overdisp_fun(metsch_spore2.glm)
+overdisp_fun(metsch_spore.glm2) 
 
-testDispersion(metsch_spore2.glm)
-# Underdispersed
-testZeroInflation(metsch_spore2.glm)
+testDispersion(metsch_spore.glm2)
+testZeroInflation(metsch_spore.glm2)
 
-metsch_spore.glm2_simResid <- simulateResiduals(fittedModel = metsch_spore2.glm)
+metsch_spore.glm2_simResid <- simulateResiduals(fittedModel = metsch_spore.glm2)
 plot(metsch_spore.glm2_simResid)
+
+#metsch_spore2.glm <- glmmTMB(Metsch.spore.in.animal ~ DayMetNum * Coinfected + PastExposed, family = nbinom1(), data = metsch_spores) 
+#summary(metsch_spore2.glm)
+
+#overdisp_fun(metsch_spore2.glm)
+
+#testDispersion(metsch_spore2.glm)
+# Underdispersed
+#testZeroInflation(metsch_spore2.glm)
+
+#metsch_spore.glm2_simResid <- simulateResiduals(fittedModel = metsch_spore2.glm)
+#plot(metsch_spore.glm2_simResid)
+
+#metsch_spores$ln.past.spores <- log(metsch_spores$Past.spore.in.animal)
+#metsch_spores$ln.past.spores[metsch_spores$ln.past.spores == -Inf] <- 0
 
 #Adding post-hoc for past exposure 
 emm_metsch_spores <- emmeans(
   metsch_spore.glm,
-  ~ PastExposed + DayMetNum * Coinfected,
-  type = "response", at = list(DayMetNum = c(5, 10, 15, 30)))
+  ~ Past.spore.in.animal,
+  type = "response", at = list(Past.spore.in.animal = c(100, 1000, 10000, 100000)))
 
 summary(emm_metsch_spores)
-pairs(emm_metsch_spores, by = "DayMetNum")
+pairs(emm_metsch_spores, by = "Past.spore.in.animal")
+
+emm_metsch_spores2 <- emmeans(
+  metsch_spore.glm,
+  ~ PastExposed + DayMetNum,
+  type = "response")
+
+summary(emm_metsch_spores2)
+
+emm_metsch_spores3 <- emmeans(
+  metsch_spore.glm,
+  ~ DayMetNum,
+  type = "response", at = list(DayMetNum = c(5,10,15,30)))
+
+summary(emm_metsch_spores3)
 
 #Does the prevalence of coinfection change over time? 
 onlycoinfectiontreatments <- subset(spores.numeric, TreatmentGroup %in% c("T3", "T4", "T5", "T6"))

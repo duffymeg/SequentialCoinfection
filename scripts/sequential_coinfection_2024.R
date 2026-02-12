@@ -15,6 +15,7 @@ library(DHARMa)
 library(glmmTMB)
 library(emmeans)
 library(car)
+library(survminer)
 
 # Overdispersion check taken from earlier code
 # Will get called later during stats section, loading it now
@@ -1193,6 +1194,8 @@ el.final.coinf <- el.final %>%
 
 cox_model.coinf <- coxph(survobject ~ DayMetNum, robust = TRUE, data = el.final.coinf)
 summary(cox_model.coinf)
+Anova(cox_model.coinf) # This gives a very different result -- look into this more
+
 cox.test <- cox.zph(cox_model.coinf) # Hazards are proportional 
 cox.test
 

@@ -18,7 +18,7 @@ library(car)
 # library(survminer)
 
 # Overdispersion check taken from earlier code
-# Will get called later during stats section, loading it now
+# Will get called later, loading it now
 overdisp_fun <- function(model) {
   rdf <- df.residual(model)
   rp <- residuals(model,type="pearson")
@@ -115,6 +115,14 @@ spores.numeric <- subset(total.spores, select = c("Metsch.spore.in.animal", "Pas
 spores.numeric <- spores.numeric %>%
   subset(!(Metsch.spore.in.animal %in% c(250, 500)) &
            !(Past.spore.in.animal %in% c(250, 500)))
+
+# Remove the animals that died on or before day 10 (and therefore couldn't be diagnosed accurately)
+spores.numeric <- spores.numeric %>%
+  filter(!(TreatmentGroup == "T2" & Rep == 3),
+         !(TreatmentGroup == "T2" & Rep == 25),
+         !(TreatmentGroup == "T4" & Rep == 5),
+         !(TreatmentGroup == "T8" & Rep == 10),
+         !(TreatmentGroup == "T9" & Rep == 25))
 
 #### Note: figure 1 is an overview of the experimental design, was not created in R
 
@@ -238,31 +246,6 @@ f2<-ggplot(past_spores_summary, aes(x = DayMetNum, y = mean_spores, color = Coin
     legend.background = element_rect(fill = "white", color = "black", linewidth = 0.3)
   ) + labs(color = NULL) + scale_y_continuous(labels = scales::label_comma()) + ylim(0, 900000)
 
-
-#The same data as above,but in a violin plot 
-#ggplot(past_spores, aes(x = Coinfected, y = Past.spore.in.animal, color = DayMetFactor, shape = MetschExposed)) +
-#  geom_violin(color = "black", fill = NA, trim = FALSE) +
-#  geom_jitter(width = 0.3, size = 3, alpha = 1, show.legend = TRUE) +
-#  theme_classic() +
-#  labs(
-#    x = NULL,
-#    y = "Number of *P. ramosa* spores per host",
-#    color = NULL
-#  ) +
-#  theme(
-#    axis.title.x = ggtext::element_markdown(), 
-#    axis.title.y = ggtext::element_markdown(),
-#    legend.text = ggtext::element_markdown(), 
-#    legend.title = ggtext::element_markdown(),
-#    legend.position = c(.01, 1),
-#    legend.justification = c("left", "top"),
-#    legend.background = element_rect(fill = "white", color = "black", linewidth = 0.3)
-#  ) +
-#  scale_color_manual(
-#    values = c("never" = "grey50", "5" = "#c1b0d6", "10" = "#ac8cd4", "15" = "#7f39d4", "30" = "#640ecc")
-#  ) +
-#  scale_x_discrete(labels = c("No" = "single infection", "Yes" = "coinfection")) +
-#  scale_y_continuous(limits = c(0, NA), labels = scales::comma)
 
 #Same thing as the two plots above, but for metsch 
 #finding prevalence of metsch infection 
@@ -616,14 +599,14 @@ summary(metsch_spore.glm.singleinf)
 overdisp_fun(metsch_spore.glm.singleinf) 
 
 metsch_spore.glm_simResid_singleinf <- simulateResiduals(fittedModel = metsch_spore.glm.singleinf)
-plot(metsch_spore.glm_simResid_singleinf). # Also overdispersed
+plot(metsch_spore.glm_simResid_singleinf) # Also overdispersed
 
-
+# For now, will skip comparison of single infection spores due to dispersion issues
 
 #### Creating figure 3 #####
 #### FECUNDITY #####
 egg <- read.csv("data/Coinfection Egg Data.csv")
-View(egg)
+# View(egg)
 
 #Add column that totals lifetime reproductive output for each individual
 egg$LifeRep <- rowSums(egg[ ,c(5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35, 37, 39, 41, 43, 45, 47, 49)], na.rm = TRUE)
@@ -639,16 +622,6 @@ egg$LifeRep <- as.integer(egg$LifeRep)
 total.egg <- cbind(egg, total.spores[c("PastExposed", "MetschExposed", "PastInfected", "MetschInfected", "PastExpStatus", "MetExpStatus", "DayMetNum", "DayMetFactor")])
 
 #Data Set Up: manipulate the egg data to show survival times
-
-#Here, I added in the dates that animals were exposed to Metsch and Past, and calculated the length of
-#survival post exposure to each parasite. If an animal did not survive 10 days after being exposed to 
-#Past, it was removed from the model analysis. If an animal did not survive 5 days after being exposed
-#to Metsch, it was removed from the model analysis. This is because premature death makes 
-#it hard/impossible to know if an animal was infected with anything or survived past the window
-#of infection and was not infected. Only 5 animals were removed and all were uninfected according 
-#to spore count data. Start date of the experiment was chosen as 10/14/2022, which was the day 
-#before Past exposures when all animals were still living (this can be changed if necessary, 
-#but it wasn't used the in the mortality analysis).
 
 #Subset the data
 egg.life <- subset(total.egg, select=c("TreatmentGroup", "Rep", "PastExposed", "MetschExposed", "PastInfected", "MetschInfected", "PastExpStatus", "MetExpStatus", "DayMetNum", "DayMetFactor", "LifeRep", "death.date"))
@@ -709,8 +682,15 @@ egg.life <- egg.life %>%
 egg.life <- egg.life %>%
   mutate(PostMetSurvival = as.duration(MetschExposureDate %--% death.date) / ddays(1))
 
+str(egg.life)
+
 #Subset the data to only include animals that made it a certain number of days past exposure to Past and Metsch (e stands for egg, l stands for life in the dataframe name)
 el.final <- subset(egg.life, lifesurvival > 10)
+str(el.final)
+
+#Summarizing who was removed -- that's a whole lot of T1 animals, suggesting something weird happened with that treatment
+el.removed <- subset(egg.life, lifesurvival < 11)
+# write.csv(el.removed, file = "el.removed.csv", row.names = FALSE)
 
 # Remove the animals that had ambiguous infections (only 1 or 2 Metsch or Past spores across four fields)
 el.final <- el.final %>%
@@ -762,6 +742,12 @@ el.final <- el.final %>%
       MetExpStatus  # keep the original value for other treatments
     )
   )
+
+
+# But, after all that, cutting T1 from the analyses because so many animals died
+el.final <- el.final %>%
+  filter(!(TreatmentGroup == "T1"))
+# That removed the 13 T1 animals that survived past day 10
 
 #adding a column that is reproduction divided by lifespan 
 el.final$egg_per_day <- el.final$LifeRep/el.final$lifesurvival
@@ -935,16 +921,24 @@ ggsave("figures/eggplot.png", eggplot, dpi = 600, width = 15, height = 12, units
 ### Analysis of fecundity data
 
 #Fecundity model 
-el.final <- na.omit(el.final) #dropping the five hosts that had egg data, but did not have spore yield to confirm infection status
+el.final <- na.omit(el.final) #dropping the host that was lost
 
-totalegg.glm <- glmmTMB(egg_per_day ~ InfStatusFactor * DayMetNum, family = gaussian, data = el.final)
+eggperday.glm <- glmmTMB(egg_per_day ~ InfStatusFactor * DayMetNum, family = gaussian, data = el.final)
+summary(eggperday.glm)
+
+eggperday.glm_simResid <- simulateResiduals(fittedModel = eggperday.glm)
+plot(eggperday.glm_simResid) # looks good
+
+Anova(eggperday.glm, type = "III") # Added by MAD -- seems like maybe the best way of doing this?
+
+
+# Checking that overall pattern would be same for total reproduction
+totalegg.glm <- glmmTMB(LifeRep ~ InfStatusFactor * DayMetNum, family = gaussian, data = el.final)
 summary(totalegg.glm)
 
 totalegg.glm_simResid <- simulateResiduals(fittedModel = totalegg.glm)
-plot(totalegg.glm_simResid) # there are some patterns in the residual, but this is the best model 
+plot(totalegg.glm_simResid) # looks quite wonky, will stick with analysis of reproduction per day
 
-
-Anova(totalegg.glm, type = "III") # Added by MAD -- seems like maybe the best way of doing this?
 
 # Look at just subsets of the data to understand patterns -- all the rest of the egg analyses added by MAD
 

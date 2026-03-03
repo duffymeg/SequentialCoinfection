@@ -15,7 +15,7 @@ library(DHARMa)
 library(glmmTMB)
 library(emmeans)
 library(car)
-library(survminer)
+# library(survminer)
 
 # Overdispersion check taken from earlier code
 # Will get called later during stats section, loading it now
@@ -33,14 +33,14 @@ here::i_am("scripts/sequential_coinfection_2024.R")
 
 # Load spore data
 total.spores <- read.csv("data/Coinfection Total Spore Yield Data.csv")
-View(total.spores)
+# View(total.spores)
 
 #Replace the #DIV/0! with NA for the cells that contain that value
 total.spores[total.spores == '#DIV/0!'] <- NA
 
 #Split apart treatment number and rep number into separate columns.
 total.spores[c('TreatmentGroup', 'Rep')] <- str_split_fixed(total.spores$sample.ID, '-', 2)
-View(total.spores)
+# View(total.spores)
 
 #Use if else statements to retrieve the infection and exposure status of animals in treatments 1-10.
 #Create new columns that denote Past and Metsch infection status and tell R to assign either Yes or No depending on treatment group
@@ -491,7 +491,7 @@ plot(past_prevalence.glm_simResid)
 past_prevalence_anova <- anova(past_prevalence.glm, test = "Chisq")
 past_prevalence_anova # This is the result for whether day of Metsch exposure influences overall Past prev in T3-T6
 
-#Does the prevalence of coinfection change over time? 
+#Does the prevalence of coinfection change with day of Metsch addition? 
 onlycoinfectiontreatments <- subset(spores.numeric, TreatmentGroup %in% c("T3", "T4", "T5", "T6"))
 levels(onlycoinfectiontreatments$Coinfected)[levels(onlycoinfectiontreatments$Coinfected) == "Yes"] <- "1"
 levels(onlycoinfectiontreatments$Coinfected)[levels(onlycoinfectiontreatments$Coinfected) == "No"] <- "0"
@@ -524,6 +524,7 @@ overdisp_fun(past_spore.glm)
 past_spore.glm_simResid <- simulateResiduals(fittedModel = past_spore.glm)
 plot(past_spore.glm_simResid)
 
+
 emm_past_spore <- emmeans(
   past_spore.glm,
   ~ Coinfected | DayMetNum,
@@ -542,11 +543,10 @@ overdisp_fun(metsch_prevalence.glm)
 metsch_prevalence.glm_simResid <- simulateResiduals(fittedModel = metsch_prevalence.glm)
 plot(metsch_prevalence.glm_simResid)
 
-# Next two lines added by MAD to match test for Past
 metsch_prevalence_anova <- anova(metsch_prevalence.glm, test = "Chisq")
-metsch_prevalence_anova # Seems like this is the result that should be reported, right? @@@@@@@@@@@@@@@@@
+metsch_prevalence_anova # This is the main result for Metsch infection prevalence
 
-#Adding post-hoc for past exposure 
+#Adding test for past exposure 
 emm_metsch_prevalence <- emmeans(
   metsch_prevalence.glm,
   ~ PastExposed + DayMetNum,
@@ -592,10 +592,10 @@ metsch_spores_T3toT6noT5 <- metsch_spores %>%
 metsch_spore.glm.2 <- glmmTMB(Metsch.spore.in.animal ~ DayMetNum*Coinfected, family = nbinom1, data = metsch_spores_T3toT6noT5) 
 summary(metsch_spore.glm.2)
 
-overdisp_fun(metsch_spore.glm.2) # This analysis says things are fine, but keep reading
+overdisp_fun(metsch_spore.glm.2) # Definitely looks better
 
 metsch_spore.glm_simResid2 <- simulateResiduals(fittedModel = metsch_spore.glm.2)
-plot(metsch_spore.glm_simResid2) # Residuals still wonky but less so?
+plot(metsch_spore.glm_simResid2) 
 
 emm_metsch_spores.2 <- emmeans(
   metsch_spore.glm.2,

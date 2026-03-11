@@ -1,0 +1,512 @@
+)
+clean_survival_summary <- na.omit(survival_summary)
+#Drop never infected
+clean_survival_summary<-subset(clean_survival_summary, !DayMetNum == "0")
+#Creating a facet plot based on terminal infection
+uninf_survival_summary <- clean_survival_summary %>%
+filter(InfStatusFactor == "Uninf")
+s1<-ggplot(uninf_survival_summary, aes(x = DayMetNum, y = mean_survival, shape = PastExpStatus)) +
+geom_point(size = 4, position = position_dodge(width = 1.25), color = "green3") +
+geom_errorbar(aes(ymin = mean_survival - se_survival, ymax = mean_survival + se_survival),
+width = 0.1, position = position_dodge(width = 1.25), color = "green3") +
+ylab("Mean lifespan of host in days") +
+xlab(NULL) +
+theme_classic() +
+theme(
+axis.title.x = ggtext::element_markdown(),
+axis.title.y = ggtext::element_markdown(),
+legend.text = ggtext::element_markdown(),
+legend.title = ggtext::element_markdown(),
+plot.title = ggtext::element_markdown(hjust = 0.5),
+legend.position = c(.01, 1),
+legend.justification = c("left", "top"),
+legend.background = element_rect(fill = "white", color = "black", linewidth = 0.3)
+) +
+labs(
+shape = NULL,
+title = "Uninfected"
+) +
+scale_y_continuous(labels = scales::label_comma(), limits = c(0,80)) +
+scale_shape_manual(
+values = c(
+"ExposedUninfected" = 16,
+"Unexposed" = 15), labels = c(
+"ExposedUninfected" = "exposed to *P. ramosa* but uninfected",
+"Unexposed" = "unexposed"))
+#creating a reference line
+mean(uninf_survival_summary$mean_survival)
+past_survival_summary <- clean_survival_summary %>%
+filter(InfStatusFactor == "Past")
+s2<-ggplot(past_survival_summary, aes(x = DayMetNum, y = mean_survival, shape = MetExpStatus)) +
+geom_point(size = 4, position = position_dodge(width = 0.4), color = "cornflowerblue") +
+geom_errorbar(aes(ymin = mean_survival - se_survival, ymax = mean_survival + se_survival),
+width = 0.1, position = position_dodge(width = 0.4), color = "cornflowerblue") +
+ylab(NULL) +
+xlab(NULL) +
+theme_classic() +
+theme(
+axis.title.x = ggtext::element_markdown(),
+axis.title.y = ggtext::element_markdown(),
+legend.text = ggtext::element_markdown(),
+legend.title = ggtext::element_markdown(),
+plot.title = ggtext::element_markdown(hjust = 0.5),
+legend.position = "none",
+legend.justification = c("left", "top"),
+legend.background = element_rect(fill = "white", color = "black", linewidth = 0.3)
+) +
+labs(
+shape = NULL,
+title = "*P. ramosa*"
+) +
+scale_y_continuous(labels = scales::label_comma(), limits = c(0,80)) +
+scale_shape_manual(
+values = c(
+"ExposedUninfected" = 16,
+"Unexposed" = 15), labels = c(
+"ExposedUninfected" = "exposed but uninfected",
+"Unexposed" = "unexposed")) + geom_hline(yintercept = 60.46355, linetype = "dashed", color = "gray40")
+metsch_survival_summary <- clean_survival_summary %>%
+filter(InfStatusFactor == "Metsch")
+s3<-ggplot(metsch_survival_summary, aes(x = DayMetNum, y = mean_survival, shape = PastExpStatus)) +
+geom_point(size = 4, position = position_dodge(width = 1.25), color = "tomato") +
+geom_errorbar(aes(ymin = mean_survival - se_survival, ymax = mean_survival + se_survival),
+width = 0.1, position = position_dodge(width = 1.25), color = "tomato") +
+ylab("Mean lifespan of host in days") +
+xlab("Day of exposure to *A. monospora*") +
+theme_classic() +
+theme(
+axis.title.x = ggtext::element_markdown(),
+axis.title.y = ggtext::element_markdown(),
+legend.text = ggtext::element_markdown(),
+legend.title = ggtext::element_markdown(),
+plot.title = ggtext::element_markdown(hjust = 0.5),
+legend.position = c(.01,1),
+legend.justification = c("left", "top"),
+legend.background = element_rect(fill = "white", color = "black", linewidth = 0.3)
+) +
+labs(
+shape = NULL,
+title = "*A. monospora*"
+) +
+scale_y_continuous(labels = scales::label_comma(), limits = c(0,80)) +
+scale_shape_manual(
+values = c(
+"ExposedUninfected" = 16,
+"Unexposed" = 15), labels = c(
+"ExposedUninfected" = "exposed to *P. ramosa* but uninfected",
+"Unexposed" = "unexposed")) + geom_hline(yintercept = 60.46355, linetype = "dashed", color = "gray40")
+coinf_survival_summary <- clean_survival_summary %>%
+filter(InfStatusFactor == "Coinf")
+s4<-ggplot(coinf_survival_summary, aes(x = DayMetNum, y = mean_survival)) +
+geom_point(size = 4, position = position_dodge(width = 0.4), color = "#7f39d4") +
+geom_errorbar(aes(ymin = mean_survival - se_survival, ymax = mean_survival + se_survival),
+width = 0.1, position = position_dodge(width = 0.4), color = "#7f39d4") +
+ylab(NULL) +
+xlab("Day of exposure to *A. monospora*") +
+theme_classic() +
+theme(
+axis.title.x = ggtext::element_markdown(),
+axis.title.y = ggtext::element_markdown(),
+legend.text = ggtext::element_markdown(),
+legend.title = ggtext::element_markdown(),
+legend.position = c(.01, .4),
+legend.justification = "none",
+legend.background = element_rect(fill = "white", color = "black", linewidth = 0.3)
+) +
+labs(
+title = "Coinfected"
+) +
+scale_y_continuous(labels = scales::label_comma(), limits = c(0,80)) +
+theme(plot.title = element_text(hjust = 0.5)) + geom_hline(yintercept = 60.46355, linetype = "dashed", color = "gray40")
+survplot <- (s1 | s2) / (s3 | s4) +
+plot_annotation(
+tag_levels = "A"
+) &
+theme(
+text = element_text(size = 18),
+axis.title = element_text(size = 18),
+axis.text = element_text(size = 16),
+legend.text = ggtext::element_markdown(size = 14),
+legend.title = ggtext::element_markdown(size = 14),
+strip.text = element_text(size = 18)
+)
+survplot
+write.csv(clean_survival_summary, file = "clean_survival_summary", row.names = FALSE)
+write.csv(clean_survival_summary, file = "clean_survival_summary.csv", row.names = FALSE)
+write.csv(clean_survival_summary, file = "clean_survival_summary.csv", row.names = FALSE)
+#Drop never exposed
+clean_survival_summary<-subset(clean_survival_summary, !DayMetNum == "0")
+#Creating a facet plot based on terminal infection
+uninf_survival_summary <- clean_survival_summary %>%
+filter(InfStatusFactor == "Uninf")
+s1<-ggplot(uninf_survival_summary, aes(x = DayMetNum, y = mean_survival, shape = PastExpStatus)) +
+geom_point(size = 4, position = position_dodge(width = 1.25), color = "green3") +
+geom_errorbar(aes(ymin = mean_survival - se_survival, ymax = mean_survival + se_survival),
+width = 0.1, position = position_dodge(width = 1.25), color = "green3") +
+ylab("Mean lifespan of host in days") +
+xlab(NULL) +
+theme_classic() +
+theme(
+axis.title.x = ggtext::element_markdown(),
+axis.title.y = ggtext::element_markdown(),
+legend.text = ggtext::element_markdown(),
+legend.title = ggtext::element_markdown(),
+plot.title = ggtext::element_markdown(hjust = 0.5),
+legend.position = c(.01, 1),
+legend.justification = c("left", "top"),
+legend.background = element_rect(fill = "white", color = "black", linewidth = 0.3)
+) +
+labs(
+shape = NULL,
+title = "Uninfected"
+) +
+scale_y_continuous(labels = scales::label_comma(), limits = c(0,80)) +
+scale_shape_manual(
+values = c(
+"ExposedUninfected" = 16,
+"Unexposed" = 15), labels = c(
+"ExposedUninfected" = "exposed to *P. ramosa* but uninfected",
+"Unexposed" = "unexposed"))
+#creating a reference line
+mean(uninf_survival_summary$mean_survival)
+past_survival_summary <- clean_survival_summary %>%
+filter(InfStatusFactor == "Past")
+s2<-ggplot(past_survival_summary, aes(x = DayMetNum, y = mean_survival, shape = MetExpStatus)) +
+geom_point(size = 4, position = position_dodge(width = 0.4), color = "cornflowerblue") +
+geom_errorbar(aes(ymin = mean_survival - se_survival, ymax = mean_survival + se_survival),
+width = 0.1, position = position_dodge(width = 0.4), color = "cornflowerblue") +
+ylab(NULL) +
+xlab(NULL) +
+theme_classic() +
+theme(
+axis.title.x = ggtext::element_markdown(),
+axis.title.y = ggtext::element_markdown(),
+legend.text = ggtext::element_markdown(),
+legend.title = ggtext::element_markdown(),
+plot.title = ggtext::element_markdown(hjust = 0.5),
+legend.position = "none",
+legend.justification = c("left", "top"),
+legend.background = element_rect(fill = "white", color = "black", linewidth = 0.3)
+) +
+labs(
+shape = NULL,
+title = "*P. ramosa*"
+) +
+scale_y_continuous(labels = scales::label_comma(), limits = c(0,80)) +
+scale_shape_manual(
+values = c(
+"ExposedUninfected" = 16,
+"Unexposed" = 15), labels = c(
+"ExposedUninfected" = "exposed but uninfected",
+"Unexposed" = "unexposed")) + geom_hline(yintercept = 60.46355, linetype = "dashed", color = "gray40")
+metsch_survival_summary <- clean_survival_summary %>%
+filter(InfStatusFactor == "Metsch")
+s3<-ggplot(metsch_survival_summary, aes(x = DayMetNum, y = mean_survival, shape = PastExpStatus)) +
+geom_point(size = 4, position = position_dodge(width = 1.25), color = "tomato") +
+geom_errorbar(aes(ymin = mean_survival - se_survival, ymax = mean_survival + se_survival),
+width = 0.1, position = position_dodge(width = 1.25), color = "tomato") +
+ylab("Mean lifespan of host in days") +
+xlab("Day of exposure to *A. monospora*") +
+theme_classic() +
+theme(
+axis.title.x = ggtext::element_markdown(),
+axis.title.y = ggtext::element_markdown(),
+legend.text = ggtext::element_markdown(),
+legend.title = ggtext::element_markdown(),
+plot.title = ggtext::element_markdown(hjust = 0.5),
+legend.position = c(.01,1),
+legend.justification = c("left", "top"),
+legend.background = element_rect(fill = "white", color = "black", linewidth = 0.3)
+) +
+labs(
+shape = NULL,
+title = "*A. monospora*"
+) +
+scale_y_continuous(labels = scales::label_comma(), limits = c(0,80)) +
+scale_shape_manual(
+values = c(
+"ExposedUninfected" = 16,
+"Unexposed" = 15), labels = c(
+"ExposedUninfected" = "exposed to *P. ramosa* but uninfected",
+"Unexposed" = "unexposed")) + geom_hline(yintercept = 60.46355, linetype = "dashed", color = "gray40")
+coinf_survival_summary <- clean_survival_summary %>%
+filter(InfStatusFactor == "Coinf")
+s4<-ggplot(coinf_survival_summary, aes(x = DayMetNum, y = mean_survival)) +
+geom_point(size = 4, position = position_dodge(width = 0.4), color = "#7f39d4") +
+geom_errorbar(aes(ymin = mean_survival - se_survival, ymax = mean_survival + se_survival),
+width = 0.1, position = position_dodge(width = 0.4), color = "#7f39d4") +
+ylab(NULL) +
+xlab("Day of exposure to *A. monospora*") +
+theme_classic() +
+theme(
+axis.title.x = ggtext::element_markdown(),
+axis.title.y = ggtext::element_markdown(),
+legend.text = ggtext::element_markdown(),
+legend.title = ggtext::element_markdown(),
+legend.position = c(.01, .4),
+legend.justification = "none",
+legend.background = element_rect(fill = "white", color = "black", linewidth = 0.3)
+) +
+labs(
+title = "Coinfected"
+) +
+scale_y_continuous(labels = scales::label_comma(), limits = c(0,80)) +
+theme(plot.title = element_text(hjust = 0.5)) + geom_hline(yintercept = 60.46355, linetype = "dashed", color = "gray40")
+survplot <- (s1 | s2) / (s3 | s4) +
+plot_annotation(
+tag_levels = "A"
+) &
+theme(
+text = element_text(size = 18),
+axis.title = element_text(size = 18),
+axis.text = element_text(size = 16),
+legend.text = ggtext::element_markdown(size = 14),
+legend.title = ggtext::element_markdown(size = 14),
+strip.text = element_text(size = 18)
+)
+survplot
+write.csv(clean_survival_summary, file = "clean_survival_summary.csv", row.names = FALSE)
+#Censor animals who lived to the end
+el.final$survobject <- with(el.final, Surv(lifesurvival, censor))
+seq_lifespan <- survfit(survobject ~ InfStatusFactor, data = el.final, conf.type = "log-log")
+summary(seq_lifespan)
+#Run Cox proportional hazards with interaction variables
+cox_model <- coxph(survobject ~ InfStatusFactor*DayMetNum, robust = TRUE, data = el.final)
+summary(cox_model)
+cox.test <- cox.zph(cox_model) # Hazards are not proportional
+cox.test
+write.csv(el.final, file = "el.final.csv", row.names = FALSE)
+# el.final_died <- subset(el.final, !censor == "1") # MAD doesn't think we want this censoring
+lifespan.glm <- glmmTMB(lifesurvival ~ InfStatusFactor*DayMetNum, family = gaussian, data = el.final)
+summary(lifespan.glm)
+testDispersion(lifespan.glm)
+testZeroInflation(lifespan.glm)
+lifespan.glm_simResid <- simulateResiduals(fittedModel = lifespan.glm)
+plot(lifespan.glm_simResid)
+el.final.met <- el.final %>%
+subset(MetschInfected == "Yes")
+lifespan.glm.singlemet <- glmmTMB(lifesurvival ~ DayMetNum, family = gaussian, data = el.final.singlemet)
+summary(lifespan.glm.singlemet)
+# just coinfected
+el.final.coinf <- el.final %>%
+subset((MetschInfected == "Yes" & PastInfected == "Yes"))
+lifespan.glm.coinf <- glmmTMB(lifesurvival ~ DayMetNum, family = gaussian, data = el.final.coinf)
+summary(lifespan.glm.coinf)
+# just singly Past infected:
+el.final.singlepast <- el.final %>%
+subset((MetschInfected == "No" & PastInfected == "Yes"))
+lifespan.glm.singlepast <- glmmTMB(lifesurvival ~ DayMetNum, family = gaussian, data = el.final.singlepast)
+summary(lifespan.glm.singlepast)
+##### Figure 5 ######
+#Body size analysis
+#Read in the body size data.
+length <- read.csv("data/Coinfection Body Size_without_continous.csv")
+length[c('TreatmentGroup', 'Rep')] <- str_split_fixed(length$sample.ID, '-', 2)
+length$TreatmentGroup < - as.factor(length$TreatmentGroup)
+length <- length %>%
+mutate(date1 = as.Date(date1, format = "%m/%d/%Y"),
+date2 = as.Date(date2, format = "%m/%d/%Y"),
+date3 = as.Date(date3, format = "%m/%d/%Y"),
+date4 = as.Date(date4, format = "%m/%d/%Y"),
+date5 = as.Date(date5, format = "%m/%d/%Y"),
+date6 = as.Date(date6, format = "%m/%d/%Y"),
+date7 = as.Date(date7, format = "%m/%d/%Y"),
+date8 = as.Date(date8, format = "%m/%d/%Y"),
+date9 = as.Date(date9, format = "%m/%d/%Y"),
+past_exposed = as.Date(past_exposed, format = "%m/%d/%Y"),
+metsch_exposed = as.Date(metsch_exposed, format = "%m/%d/%Y"),
+expstart = as.Date(expstart, format = "%m/%d/%Y"))
+#Try sub-setting the data so that only the size measurements (and not the dates on which they were measured)
+#are shown and view it again. nd stands for "no dates".
+length.nd <- length[, c(1, 2, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 24, 25, 26)]
+#Try reformatting the body size data, so that the size measurements are all in one column labeled "measurement".
+#Long.data is the new name because the type of data we are converting to is called "long data".
+long.data <- melt(data = length.nd,
+id.vars = c("sample.ID", "TreatmentGroup", "Rep", "Terminal.infection", "past_exposed", "metsch_exposed", "expstart"),
+measured.vars = c("size1", "size2", "size3", "size4", "size5", "size6", "size7", "size8","size9"),
+variable.name = "date", value.name = "bodysize")
+#Create a real date column so dates aren't listed as size1, size2, etc.
+long.data$realdate <- with(long.data, ifelse(date == "size1", "10/18/2022", ifelse(date == "size2", "10/25/2022", ifelse(date == "size3", "11/01/2022", ifelse(date == "size4", "11/08/2022", ifelse(date == "size5", "11/15/2022", ifelse(date == "size6", "11/22/2022", ifelse(date == "size7", "11/29/2022", ifelse(date == "size8", "12/06/2022", "12/13/2022")))))))))
+#Change date to be recognized as a date and not a character
+long.data <- long.data %>%
+mutate(realdate = as.Date(realdate, format = "%m/%d/%Y"))
+#Add DayMet and Exposure Status as columns to dataframe
+long.data$Coexposed <- with(long.data, ifelse(TreatmentGroup == "T3" | TreatmentGroup == "T4" | TreatmentGroup == "T5" | TreatmentGroup == "T6", "Yes", "No"))
+long.data$DayMet <- with(long.data, ifelse(TreatmentGroup == "T1" | TreatmentGroup == "T2", "None",
+ifelse(TreatmentGroup == "T3" | TreatmentGroup == "T7", 5,
+ifelse(TreatmentGroup == "T4" | TreatmentGroup == "T8", 10,
+ifelse(TreatmentGroup == "T5" | TreatmentGroup == "T9", 15, 30)))))
+long.data$Coexposed <- as.factor(long.data$Coexposed)
+long.data$DayMet <- as.factor(long.data$DayMet)
+long.data$DayMet <- factor(long.data$DayMet, c("None", "5", "10", "15", "30"))
+long.data$TreatmentGroup <- factor(long.data$TreatmentGroup, c("T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8", "T9", "T10"))
+str(long.data)
+#Adding in CSCAR suggested things i.e. making treatments continuous variables and log transforming body size
+long.data$days_since_metsch_exposure <- (long.data$realdate - long.data$metsch_exposed)
+long.data$days_since_metsch_exposure <- (as.numeric(long.data$days_since_metsch_exposure))
+long.data$days_since_metsch_exposure[is.na(long.data$days_since_metsch_exposure)] <- 0
+long.data$days_since_past_exposure <- (long.data$realdate - long.data$past_exposed)
+long.data$days_since_past_exposure <- (as.numeric(long.data$days_since_past_exposure))
+long.data$days_since_past_exposure[is.na(long.data$days_since_past_exposure)] <- 0
+long.data$days_diff <- (long.data$days_since_past_exposure - long.data$days_since_metsch_exposure)
+long.data$time <-(long.data$realdate - long.data$expstart)
+long.data$time <- (as.numeric(long.data$time))
+long.data[long.data<0] <- 0
+#transforming into a linear relationship
+long.data$transformedbody <- (log10(1 -long.data$bodysize/2185.39))
+long.data$transformedbody <- (long.data$transformedbody*-1)
+#adding a unique identifier to each daphnia for random intercept
+long.data <- transform(long.data, uniqueident = as.numeric(factor(sample.ID)))
+#drop any body size that is NA
+long.data <- long.data %>% drop_na(transformedbody)
+#looking around for outliers
+ggplot(long.data, aes(x=time, y=bodysize)) +  geom_point()
+#This transformation looks pretty good
+ggplot(long.data, aes(x=time, y=transformedbody)) +  geom_point()
+ggplot(long.data, aes(x=days_since_metsch_exposure, y=transformedbody)) +  geom_point()
+ggplot(long.data, aes(x=days_since_past_exposure, y=transformedbody)) +  geom_point()
+ggplot(long.data, aes(x=days_since_past_exposure, y=transformedbody, shape=TreatmentGroup, color=TreatmentGroup)) +
+geom_point() + geom_smooth(se = FALSE)
+long.data$Terminal.infection <- as.factor(long.data$Terminal.infection)
+long.data$Terminal.infection <- relevel(long.data$Terminal.infection, "none")
+#Adding breaks so the plots match
+common_breaks <- seq(0, 65, by = 15)
+scale_x_continuous(
+limits = c(0, 30),
+breaks = common_breaks
+)
+#Body size vs exposure
+long.data_noinfections <- subset(long.data,Terminal.infection=="none")
+long.data_noinfections <- long.data_noinfections %>%
+mutate(
+exposure = case_when(
+TreatmentGroup == "T1" ~ "never_exposed",
+TreatmentGroup == "T2" ~ "only_past",
+TreatmentGroup %in% c("T3", "T4", "T5", "T6") ~ "coexposed",
+TreatmentGroup %in% c("T7", "T8", "T9", "T10") ~ "only_metsch",
+TRUE ~ NA_character_
+)
+)
+l1<-ggplot(long.data_noinfections, aes(x=time, y=transformedbody, color=exposure)) + geom_point(alpha = .4) +
+geom_smooth(
+se = FALSE,
+method = "gam",
+formula = y ~ s(x, k = 4)
+) +
+theme_minimal() +
+xlab("") + ylab("Transformed body size") +
+scale_color_manual(
+name = "Exposure status",
+values = c(
+"never_exposed" = "green3",
+"only_past" = "cornflowerblue",
+"only_metsch" = "tomato",
+"coexposed" = "#7f39d4"),
+labels = c(
+"never_exposed" = "never exposed",
+"only_past" = "*P. ramosa* exposed",
+"only_metsch" = "*A. monospora* exposed",
+"coexposed" = "coexposed"),  breaks = c("never_exposed", "coexposed", "only_metsch", "only_past")) +
+theme_classic() +
+theme(
+axis.title.x = ggtext::element_markdown(),
+axis.title.y = ggtext::element_markdown(),
+legend.text = ggtext::element_markdown(),
+legend.title = ggtext::element_markdown(),
+legend.position = c(.01, 1),
+legend.justification = c("left", "top"),
+legend.background = element_rect(
+fill = "white",
+color = "black",
+linewidth = 0.3)) +
+scale_x_continuous(
+limits = c(0, 65),
+breaks = common_breaks
+)
+#Graph showing body size plotted against terminal infection
+l2<-ggplot(long.data,
+aes(x = time,
+y = transformedbody,
+color = Terminal.infection)) +
+geom_point(alpha = 0.4) +
+geom_smooth(
+se = FALSE,
+method = "gam",
+formula = y ~ s(x, k = 4)
+) +
+scale_color_manual(
+name = "Infection status",
+values = c(
+"none" = "green3",
+"past" = "cornflowerblue",
+"metsch" = "tomato",
+"coinfected" = "#7f39d4"
+),
+labels = c(
+"none" = "uninfected",
+"past" = "*P. ramosa*",
+"metsch" = "*A. monospora*",
+"coinfected" = "coinfected"
+)
+) +
+xlab("Time in days") +
+ylab(NULL) +
+theme_classic() +
+theme(
+axis.title.x = ggtext::element_markdown(),
+axis.title.y = ggtext::element_markdown(),
+legend.text = ggtext::element_markdown(),
+legend.title = ggtext::element_markdown(),
+legend.position = c(.01, 1),
+legend.justification = c("left", "top"),
+legend.background = element_rect(
+fill = "white",
+color = "black",
+linewidth = 0.3
+)
+) +
+scale_x_continuous(
+limits = c(0, 65),
+breaks = common_breaks
+)
+#graph about does metsch through time change size in coinfected individuals
+coinfected_bodysize <- subset(long.data, Terminal.infection=="coinfected")
+l3<-ggplot(coinfected_bodysize, aes(x=time, y=transformedbody, color=DayMet)) + geom_point(alpha = .4) +
+geom_smooth(
+se = FALSE,
+method = "gam",
+formula = y ~ s(x, k = 4)) +
+xlab("Time in days") + ylab("Transformed body size")  +
+scale_color_manual(
+name = "Day of exposure to *A. monospora*", values = c("None" = "grey50", "5" = "mediumpurple1", "10" = "mediumpurple2", "15" = "mediumpurple3", "30" = "mediumpurple4")) +
+theme_classic() +
+theme(
+axis.title.x = ggtext::element_markdown(),
+axis.title.y = ggtext::element_markdown(),
+legend.text = ggtext::element_markdown(),
+legend.title = ggtext::element_markdown(),
+legend.position = c(.01, 1),
+legend.justification = c("left", "top"),
+legend.background = element_rect(
+fill = "white",
+color = "black",
+linewidth = 0.3
+)) +
+scale_x_continuous(
+limits = c(0, 65),
+breaks = common_breaks
+)
+l_blank <- patchwork::plot_spacer()
+bodysize <- (l1 | l2) / (l3 | l_blank)+
+plot_annotation(
+tag_levels = "A"
+) &
+theme(
+text = element_text(size = 18),
+axis.title = element_text(size = 18),
+axis.text = element_text(size = 16),
+legend.text = ggtext::element_markdown(size = 14),
+legend.title = ggtext::element_markdown(size = 14),
+strip.text = element_text(size = 18)
+)
+bodysize

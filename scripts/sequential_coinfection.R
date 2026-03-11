@@ -1,5 +1,3 @@
-# Next up: streamline code -- lots of unneeded stuff in here right now
-
 #Load libraries
 library(tidyverse)
 library(patchwork)
@@ -26,7 +24,7 @@ overdisp_fun <- function(model) {
 }
 
 # Tell R where files are stored
-here::i_am("scripts/sequential_coinfection_2024.R")
+here::i_am("scripts/sequential_coinfection.R")
 
 # Load spore data
 total.spores <- read.csv("data/Coinfection Total Spore Yield Data.csv")
@@ -168,7 +166,7 @@ prevalence_sum <- prevalence_by_coinfection %>%
 # Step 3: Combine original and sum data
 prevalence_combined <- bind_rows(prevalence_by_coinfection, prevalence_sum)
 
-# Optional: make Coinfected labels more readable
+# make Coinfected labels more readable
 prevalence_combined$Coinfected <- factor(
   prevalence_combined$Coinfected,
   levels = c("No", "Yes", "Sum"),
@@ -214,7 +212,7 @@ past_spores_summary <- past_spores %>%
     .groups = "drop"
   )
 
-# Optional: make Coinfected labels more readable
+# make Coinfected labels more readable
 past_spores_summary$Coinfected <- factor(
   past_spores_summary$Coinfected,
   levels = c("No", "Yes"),
@@ -290,7 +288,7 @@ prevalence_metsch_sum_with_singly_exposed <-
 # Step 3: Combine original and sum data
 prevalence_combined_metsch_with_singly_exposed <- bind_rows(prevalence_by_coinfection_metsch_with_singlyexposed, prevalence_metsch_sum_with_singly_exposed)
 
-# Optional: make Coinfected labels more readable
+# make Coinfected labels more readable
 prevalence_combined_metsch_with_singly_exposed$Coinfected <- factor(
   prevalence_combined_metsch_with_singly_exposed$Coinfected,
   levels = c("No", "Yes", "Sum"),
@@ -372,7 +370,7 @@ metsch_spores_summary <- metsch_spores %>%
     .groups = "drop"
   )
 
-# Optional: make Coinfected labels more readable
+# make Coinfected labels more readable
 metsch_spores_summary$Coinfected <- factor(
   metsch_spores_summary$Coinfected,
   levels = c("No", "Yes"),
@@ -491,9 +489,6 @@ coinf_anova <- anova(onlycoinfectiontreatments.glm, test = "Chisq")
 coinf_anova # This is the result for whether day of Metsch exposure influences coinfection prev in T3-T6
 
 #Now looking at Past spore yield
-# removing the next line of code -- already had past_spores which already does this
-# past_spores_only <- subset(past2, PastInfected_numeric == "1")
-
 mean(past_spores$Past.spore.in.animal)
 var(past_spores$Past.spore.in.animal) 
 
@@ -601,7 +596,6 @@ plot(metsch_spore.glm_simResid_singleinf) # Also overdispersed
 
 # Skipping comparison of single infection spores due to dispersion issues
 
-#### Creating figure 3 #####
 #### FECUNDITY #####
 egg <- read.csv("data/Coinfection Egg Data.csv")
 # View(egg)
@@ -648,9 +642,6 @@ egg.life <- egg.life %>%
 #Add a column with length of survival time in days from start of experiment
 egg.life <- egg.life %>%
   mutate(lifesurvival = as.duration(start.date %--% death.date) / ddays(1))
-
-#Subset the data to just treatments 3-6 for now
-#egg.life.3to6 <- subset(egg.life, PastExposed == "Yes" & DayMetNum != "0" & DayMetFactor != "0" & PastInfected != "NA")
 
 #Add in Past exposure date column
 egg.life <- egg.life %>%
@@ -712,37 +703,7 @@ el.final$InfStatusFactor <- factor(el.final$InfStatusFactor, c("Uninf", "Past", 
 el.final$DayMetFactor <- factor(el.final$DayMetFactor)
 el.final$DayMetFactor <- relevel(el.final$DayMetFactor, "0")
 
-#Never exposed get called uninfected 
-# el.final <- el.final %>%
-#   mutate(
-#     InfStatusFactor = if_else(
-#       TreatmentGroup == "T1",
-#       fct_na_value_to_level(InfStatusFactor, "Uninf"),  # convert NAs to "Uninf" only for T1
-#       InfStatusFactor  # keep the original value for other treatments
-#     )
-#   )
-# 
-# el.final <- el.final %>%
-#   mutate(
-#     PastExpStatus = if_else(
-#       TreatmentGroup == "T1",
-#       fct_na_value_to_level(PastExpStatus, "Unexposed"),  # convert NAs to "Uninf" only for T1
-#       PastExpStatus  # keep the original value for other treatments
-#     )
-#   )
-# 
-# 
-# el.final <- el.final %>%
-#   mutate(
-#     MetExpStatus = if_else(
-#       TreatmentGroup == "T1",
-#       fct_na_value_to_level(MetExpStatus, "Unexposed"),  # convert NAs to "Uninf" only for T1
-#       MetExpStatus  # keep the original value for other treatments
-#     )
-#   )
-
-
-# But, after all that, cutting T1 from the analyses because so many animals died
+# Cutting T1 from the analyses because so many animals died
 el.final <- el.final %>%
   filter(!(TreatmentGroup == "T1"))
 # That removed the 13 T1 animals that survived past day 10
@@ -768,199 +729,18 @@ el.final_summary <- el.final %>%
 
 clean_el.final_summary <- na.omit(el.final_summary)
 
-#levels(clean_el.final_summary$DayMetFactor) <- 
-#  sub("^0$", "never", levels(clean_el.final_summary$DayMetFactor))
-
 #Drop the 0 time point 
 clean_el.final_summary <- subset(clean_el.final_summary, !DayMetNum == "0")
 
-#Creating a facet plot based on terminal infection 
-uninf_egg_summary <- clean_el.final_summary %>%
-  filter(InfStatusFactor == "Uninf")
-
-# Not using this panel anymore, haven't updated to be correct y axes
-e1<-ggplot(uninf_egg_summary, aes(x = DayMetNum, y = total_fecundity, shape = PastExpStatus)) +
-  geom_point(size = 4, position = position_dodge(width = 1), color = "green3") +
-  geom_errorbar(aes(ymin = total_fecundity - se_fecundity, ymax = total_fecundity + se_fecundity), 
-                width = 0.1, position = position_dodge(width = 1), color = "green3") +
-  scale_color_manual(
-  labels = c(
-        "ExposedUninfected" = "exposed to *P. ramosa*",
-        "Unexposed" = "unexposed")) +
-  ylab("Mean fecundity per host per day") +
-  xlab(NULL) +
-  theme_classic() +
-  theme(
-    axis.title.x = ggtext::element_markdown(),
-    axis.title.y = ggtext::element_markdown(),
-    legend.text = ggtext::element_markdown(),
-    legend.title = ggtext::element_markdown(),
-    legend.position = c(.01, 1),
-    legend.justification = c("left", "top"),
-    legend.background = element_rect(fill = "white", color = "black", linewidth = 0.3)
-  ) +
-  labs(
-    shape = NULL,
-    title = "Exposed but uninfected"   
-  ) +
-  scale_y_continuous(labels = scales::label_comma()) +
-  scale_shape_manual(
-    values = c(
-      "ExposedUninfected" = 16,
-      "Unexposed" = 15), labels = c(
-        "ExposedUninfected" = "exposed to *P. ramosa*", "Unexposed" = "unexposed *P. ramosa*")) + theme(plot.title = element_text(hjust = 0.5)) + ylim(0, 3)
-
-#Add a reference line for mean uninfected eggs 
+# Mean for reference line for mean total uninfected eggs 
 el.final_uninf <- subset(el.final, InfStatusFactor == "Uninf")
-mean(el.final_uninf$egg_per_day)  # 1.843502
+mean(el.final_uninf$LifeRep)  # 114.1034
 
-#Creating the second graph for the egg facet plot 
+#Creating the Past panel for the host fitness combo plot 
 past_egg_summary <- clean_el.final_summary %>%
   filter(InfStatusFactor == "Past")
 
-e2<-ggplot(past_egg_summary, aes(x = DayMetNum, y = perday_fecundity, shape = MetExpStatus)) +
-  geom_point(size = 4, position = position_dodge(width = 0.4), color = "cornflowerblue") +
-  geom_errorbar(aes(ymin = perday_fecundity - se_perdayfecundity, ymax = perday_fecundity + se_perdayfecundity), 
-                width = 0.1, position = position_dodge(width = 0.4), color = "cornflowerblue") +
-  geom_hline(yintercept = 1.843502, linetype = "dashed", color = "gray40") +   
-  ylab(NULL) +
-  xlab(NULL) +
-  theme_classic() +
-  theme(
-    axis.title.x = ggtext::element_markdown(),
-    axis.title.y = ggtext::element_markdown(),
-    legend.text = ggtext::element_markdown(),
-    legend.title = ggtext::element_markdown(),
-    plot.title = ggtext::element_markdown(hjust = 0.5),
-    legend.background = element_rect(fill = "white", color = "black", linewidth = 0.3),
-    legend.position = "none"     # This hides the legend
-  ) +
-  labs(title = "*P. ramosa*") +
-  scale_y_continuous(labels = scales::label_comma()) +
-  scale_shape_manual(
-    values = c(
-      "ExposedUninfected" = 16,
-      "Unexposed" = 15
-    ),
-    labels = c(
-      "ExposedUninfected" = "exposed but uninfected",
-      "Unexposed" = "unexposed"
-    )
-  ) +
-  ylim(0, 3)
-
-#Creating the third graph for the egg facet plot 
-metsch_egg_summary <- clean_el.final_summary %>%
-  filter(InfStatusFactor == "Metsch")
-
-e3<-ggplot(metsch_egg_summary, aes(x = DayMetNum, y = perday_fecundity, shape = PastExpStatus)) +
-  geom_point(size = 4, position = position_dodge(width = 1), color = "tomato") +
-  geom_errorbar(aes(ymin = perday_fecundity - se_perdayfecundity, ymax = perday_fecundity + se_perdayfecundity), 
-                width = 0.1, position = position_dodge(width = 1), color = "tomato") +
-  ylab("Mean fecundity per host per day") +
-  xlab("Day of exposure to *A. monospora*") +
-  theme_classic() +
-  theme(
-    axis.title.x = ggtext::element_markdown(),
-    axis.title.y = ggtext::element_markdown(),
-    legend.text = ggtext::element_markdown(),
-    legend.title = ggtext::element_markdown(),
-     plot.title = ggtext::element_markdown(hjust = 0.5),
-    legend.position = c(.01, 1),
-    legend.justification = c("left", "top"),
-    legend.background = element_rect(fill = "white", color = "black", linewidth = 0.3)
-  ) +
-  labs(
-    shape = NULL,
-    title = "*A. monospora*"   
-  ) +
-  scale_y_continuous(labels = scales::label_comma()) +
-scale_shape_manual(
-  values = c(
-    "ExposedUninfected" = 16,
-    "Unexposed" = 15), labels = c(
-      "ExposedUninfected" = "exposed to *P. ramosa* but uninfected",
-      "Unexposed" = "unexposed to *P. ramosa*")) + ylim(0,3) +
-  geom_hline(yintercept = 1.843502, linetype = "dashed", color = "gray40")
-
-#Creating the fourth graph for the egg facet plot 
-coinf_egg_summary <- clean_el.final_summary %>%
-  filter(InfStatusFactor == "Coinf")
-
-e4<-ggplot(coinf_egg_summary, aes(x = DayMetNum, y = perday_fecundity)) +
-  geom_point(size = 4, position = position_dodge(width = 0.4), color = "#7f39d4") +
-  geom_errorbar(aes(ymin = perday_fecundity - se_perdayfecundity, ymax = perday_fecundity + se_perdayfecundity), 
-                width = 0.1, position = position_dodge(width = 0.4), color = "#7f39d4") +
-  ylab(NULL) +
-  xlab("Day of exposure to *A. monospora*") +
-  theme_classic() +
-  theme(
-    axis.title.x = ggtext::element_markdown(),
-    axis.title.y = ggtext::element_markdown(),
-    legend.text = ggtext::element_markdown(),
-    legend.title = ggtext::element_markdown(),
-    plot.title = ggtext::element_markdown(hjust = 0.5),
-    legend.position = c(.01, 1),
-    legend.justification = c("left", "top"),
-    legend.background = element_rect(fill = "white", color = "black", linewidth = 0.3)
-  )  + scale_y_continuous(labels = scales::label_comma()) +
-  labs(
-    title = "Coinfected"  
-  ) + ylim(0,3) + geom_hline(yintercept = 1.843502, linetype = "dashed", color = "gray40")
-
-
-eggplot<- (e1 | e2) / (e3 | e4) +
-  plot_annotation(
-    tag_levels = "A"
-  ) &
-  theme(
-    text = element_text(size = 18),
-    axis.title = element_text(size = 18),
-    axis.text = element_text(size = 16),
-    legend.text = ggtext::element_markdown(size = 14),
-    legend.title = ggtext::element_markdown(size = 14),
-    strip.text = element_text(size = 18)
-  )
-eggplot
-# ggsave("figures/eggplot.png", eggplot, dpi = 600, width = 15, height = 12, units = "in")
-
-# adding y axis for combo plot
-e2v2<-ggplot(past_egg_summary, aes(x = DayMetNum, y = perday_fecundity, shape = MetExpStatus)) +
-  geom_point(size = 4, position = position_dodge(width = 0.4), color = "cornflowerblue") +
-  geom_errorbar(aes(ymin = perday_fecundity - se_perdayfecundity, ymax = perday_fecundity + se_perdayfecundity), 
-                width = 0.1, position = position_dodge(width = 0.4), color = "cornflowerblue") +
-  geom_hline(yintercept = 1.843502, linetype = "dashed", color = "gray40") +   
-  ylab("Mean fecundity per host per day") +
-  xlab(NULL) +
-  theme_classic() +
-  theme(
-    axis.title.x = ggtext::element_markdown(),
-    axis.title.y = ggtext::element_markdown(),
-    legend.text = ggtext::element_markdown(),
-    legend.title = ggtext::element_markdown(),
-    plot.title = ggtext::element_markdown(hjust = 0.5),
-    legend.background = element_rect(fill = "white", color = "black", linewidth = 0.3),
-    legend.position = "none"     # This hides the legend
-  ) +
-  labs(title = "*P. ramosa*") +
-  scale_y_continuous(labels = scales::label_comma()) +
-  scale_shape_manual(
-    values = c(
-      "ExposedUninfected" = 16,
-      "Unexposed" = 15
-    ),
-    labels = c(
-      "ExposedUninfected" = "exposed but uninfected",
-      "Unexposed" = "unexposed"
-    )
-  ) +
-  ylim(0, 3)
-
-#Add a reference line for mean total uninfected eggs 
-mean(el.final_uninf$LifeRep)  # 114.1034
-
-# now making one for total fecundity
-e2v3<-ggplot(past_egg_summary, aes(x = DayMetNum, y = total_fecundity, shape = MetExpStatus)) +
+e1<-ggplot(past_egg_summary, aes(x = DayMetNum, y = total_fecundity, shape = MetExpStatus)) +
   geom_point(size = 4, position = position_dodge(width = 0.4), color = "cornflowerblue") +
   geom_errorbar(aes(ymin = total_fecundity - se_totalfecundity, ymax = total_fecundity + se_totalfecundity), 
                 width = 0.1, position = position_dodge(width = 0.4), color = "cornflowerblue") +
@@ -992,37 +772,11 @@ e2v3<-ggplot(past_egg_summary, aes(x = DayMetNum, y = total_fecundity, shape = M
   ylim(0, 150)
 
 
-e3v2<-ggplot(metsch_egg_summary, aes(x = DayMetNum, y = perday_fecundity, shape = PastExpStatus)) +
-  geom_point(size = 4, position = position_dodge(width = 1), color = "tomato") +
-  geom_errorbar(aes(ymin = perday_fecundity - se_perdayfecundity, ymax = perday_fecundity + se_perdayfecundity), 
-                width = 0.1, position = position_dodge(width = 1), color = "tomato") +
-  ylab("Mean fecundity per host per day") +
-  xlab(NULL) +
-  theme_classic() +
-  theme(
-    axis.title.x = ggtext::element_markdown(),
-    axis.title.y = ggtext::element_markdown(),
-    legend.text = ggtext::element_markdown(),
-    legend.title = ggtext::element_markdown(),
-    plot.title = ggtext::element_markdown(hjust = 0.5),
-    legend.position = c(.01, 1),
-    legend.justification = c("left", "top"),
-    legend.background = element_rect(fill = "white", color = "black", linewidth = 0.3)
-  ) +
-  labs(
-    shape = NULL,
-    title = "*A. monospora*"   
-  ) +
-  scale_y_continuous(labels = scales::label_comma()) +
-  scale_shape_manual(
-    values = c(
-      "ExposedUninfected" = 16,
-      "Unexposed" = 15), labels = c(
-        "ExposedUninfected" = "exposed to *P. ramosa* but uninfected",
-        "Unexposed" = "unexposed to *P. ramosa*")) + ylim(0,3) +
-  geom_hline(yintercept = 1.843502, linetype = "dashed", color = "gray40")
+#Creating the Metsch panel for the host fitness combo plot 
+metsch_egg_summary <- clean_el.final_summary %>%
+  filter(InfStatusFactor == "Metsch")
 
-e3v3<-ggplot(metsch_egg_summary, aes(x = DayMetNum, y = total_fecundity, shape = PastExpStatus)) +
+e2<-ggplot(metsch_egg_summary, aes(x = DayMetNum, y = total_fecundity, shape = PastExpStatus)) +
   geom_point(size = 4, position = position_dodge(width = 1), color = "tomato") +
   geom_errorbar(aes(ymin = total_fecundity - se_totalfecundity, ymax = total_fecundity + se_totalfecundity), 
                 width = 0.1, position = position_dodge(width = 1), color = "tomato") +
@@ -1053,31 +807,11 @@ e3v3<-ggplot(metsch_egg_summary, aes(x = DayMetNum, y = total_fecundity, shape =
   geom_hline(yintercept = 114.1034, linetype = "dashed", color = "gray40")
 
 
+#Creating the coinfected panel for the host fitness combo plot 
+coinf_egg_summary <- clean_el.final_summary %>%
+  filter(InfStatusFactor == "Coinf")
 
-
-e4v2<-ggplot(coinf_egg_summary, aes(x = DayMetNum, y = total_fecundity)) +
-  geom_point(size = 4, position = position_dodge(width = 0.4), color = "#7f39d4") +
-  geom_errorbar(aes(ymin = total_fecundity - se_totalfecundity, ymax = total_fecundity + se_totalfecundity), 
-                width = 0.1, position = position_dodge(width = 0.4), color = "#7f39d4") +
-  ylab("Mean fecundity per host per day") +
-  xlab("Day of exposure to *A. monospora*") +
-  theme_classic() +
-  theme(
-    axis.title.x = ggtext::element_markdown(),
-    axis.title.y = ggtext::element_markdown(),
-    legend.text = ggtext::element_markdown(),
-    legend.title = ggtext::element_markdown(),
-    plot.title = ggtext::element_markdown(hjust = 0.5),
-    legend.position = c(.01, 1),
-    legend.justification = c("left", "top"),
-    legend.background = element_rect(fill = "white", color = "black", linewidth = 0.3)
-  )  + scale_y_continuous(labels = scales::label_comma()) +
-  labs(
-    title = "Coinfected"  
-  ) + ylim(0,150) + geom_hline(yintercept = 114.1034, linetype = "dashed", color = "gray40")
-
-
-e4v3<-ggplot(coinf_egg_summary, aes(x = DayMetNum, y = total_fecundity)) +
+e3<-ggplot(coinf_egg_summary, aes(x = DayMetNum, y = total_fecundity)) +
   geom_point(size = 4, position = position_dodge(width = 0.4), color = "#7f39d4") +
   geom_errorbar(aes(ymin = total_fecundity - se_totalfecundity, ymax = total_fecundity + se_totalfecundity), 
                 width = 0.1, position = position_dodge(width = 0.4), color = "#7f39d4") +
@@ -1101,31 +835,12 @@ e4v3<-ggplot(coinf_egg_summary, aes(x = DayMetNum, y = total_fecundity)) +
 
 ### Analysis of fecundity data
 
-#Fecundity model 
-# el.final <- na.omit(el.final) #dropping the host that was lost (already done above)
-
-eggperday.glm <- glmmTMB(egg_per_day ~ InfStatusFactor * DayMetNum, family = tweedie(link="log"), data = el.final)
-summary(eggperday.glm)
-
-eggperday.glm_simResid <- simulateResiduals(fittedModel = eggperday.glm)
-plot(eggperday.glm_simResid) # looks okay
-
-Anova(eggperday.glm, type = "III") # Not the result in the manuscript because this includes uninfecteds which doesn't make a lot of sense
-
-
 # Look at just infecteds 
 
 # all infected hosts
 el.final.inf <- el.final %>%
   subset(!(MetschInfected == "No" & PastInfected == "No"))
 
-eggperday.glm.inf <- glmmTMB(egg_per_day ~ InfStatusFactor * DayMetNum, family = tweedie(link="log"), data = el.final.inf)
-summary(eggperday.glm.inf)
-
-eggperday.glm.inf_simResid <- simulateResiduals(fittedModel = eggperday.glm.inf)
-plot(eggperday.glm.inf_simResid) 
-
-Anova(eggperday.glm.inf, type = "III") 
 
 # totalegg.glm.inf_gaussian <- glmmTMB(LifeRep ~ InfStatusFactor * DayMetNum, family = gaussian, data = el.final.inf) #DHARMa check won't run on gaussian
 # totalegg.glm.inf_nb2 <- glmmTMB(LifeRep ~ InfStatusFactor * DayMetNum, family = nbinom2, data = el.final.inf) # DHARMa indicates significant deviation on QQ plots
@@ -1140,14 +855,11 @@ Anova(totalegg.glm.inf_nb1, type = "III")
 emm_trends <- emtrends(totalegg.glm.inf_nb1,
                        ~ InfStatusFactor,
                        var = "DayMetNum")
-summary(emm_trends)
-# This directly tests whether the slope of DayMetNum 
-# is significant within each infection class
+summary(emm_trends) # testing whether the slope of DayMetNum is significant within each infection class
 
 # Compare slopes across infection classes
-pairs(emm_trends)
+pairs(emm_trends) # not using this, though confirms what is obvious from looking at the plot and from emtrends
 
-####CREATING FIGURE 4#####
 ### Survival ###
 
 #Finding the mean lifetime fecundity for each treatment 
@@ -1167,38 +879,7 @@ clean_survival_summary<-subset(clean_survival_summary, !DayMetNum == "0")
 
 # write.csv(clean_survival_summary, file = "clean_survival_summary.csv", row.names = FALSE)
 
-#Creating a facet plot based on terminal infection 
-uninf_survival_summary <- clean_survival_summary %>%
-  filter(InfStatusFactor == "Uninf")
-
-s1<-ggplot(uninf_survival_summary, aes(x = DayMetNum, y = mean_survival, shape = PastExpStatus)) +
-  geom_point(size = 4, position = position_dodge(width = 1.25), color = "green3") +
-  geom_errorbar(aes(ymin = mean_survival - se_survival, ymax = mean_survival + se_survival), 
-                width = 0.1, position = position_dodge(width = 1.25), color = "green3") +
-  ylab("Host lifespan (days)") +
-  xlab(NULL) +
-  theme_classic() +
-  theme(
-    axis.title.x = ggtext::element_markdown(),
-    axis.title.y = ggtext::element_markdown(),
-    legend.text = ggtext::element_markdown(),
-    legend.title = ggtext::element_markdown(),
-    plot.title = ggtext::element_markdown(hjust = 0.5),
-    legend.position = c(.01, 1),
-    legend.justification = c("left", "top"),
-    legend.background = element_rect(fill = "white", color = "black", linewidth = 0.3)
-  ) +
-  labs(
-    shape = NULL,
-    title = "Exposed but uninfected"  
-  ) +
-  scale_y_continuous(labels = scales::label_comma(), limits = c(0,80)) +
-  scale_shape_manual(
-    values = c(
-      "ExposedUninfected" = 16,
-      "Unexposed" = 15), labels = c(
-        "ExposedUninfected" = "exposed to *P. ramosa* but uninfected",
-        "Unexposed" = "unexposed to *P. ramosa*"))
+#Creating a panels for combo plot 
 
 #creating a reference line 
 mean(el.final_uninf$lifesurvival)  # 60.36782
@@ -1206,11 +887,11 @@ mean(el.final_uninf$lifesurvival)  # 60.36782
 past_survival_summary <- clean_survival_summary %>%
   filter(InfStatusFactor == "Past")
 
-s2<-ggplot(past_survival_summary, aes(x = DayMetNum, y = mean_survival, shape = MetExpStatus)) +
+s1<-ggplot(past_survival_summary, aes(x = DayMetNum, y = mean_survival, shape = MetExpStatus)) +
   geom_point(size = 4, position = position_dodge(width = 0.4), color = "cornflowerblue") +
   geom_errorbar(aes(ymin = mean_survival - se_survival, ymax = mean_survival + se_survival), 
                 width = 0.1, position = position_dodge(width = 0.4), color = "cornflowerblue") +
-  ylab(NULL) +
+  ylab("Host lifespan (days)") +
   xlab(NULL) +
   theme_classic() +
   theme(
@@ -1238,12 +919,12 @@ s2<-ggplot(past_survival_summary, aes(x = DayMetNum, y = mean_survival, shape = 
 metsch_survival_summary <- clean_survival_summary %>%
   filter(InfStatusFactor == "Metsch")
 
-s3<-ggplot(metsch_survival_summary, aes(x = DayMetNum, y = mean_survival, shape = PastExpStatus)) +
+s2<-ggplot(metsch_survival_summary, aes(x = DayMetNum, y = mean_survival, shape = PastExpStatus)) +
   geom_point(size = 4, position = position_dodge(width = 1.25), color = "tomato") +
   geom_errorbar(aes(ymin = mean_survival - se_survival, ymax = mean_survival + se_survival), 
                 width = 0.1, position = position_dodge(width = 1.25), color = "tomato") +
   ylab("Host lifespan (days)") +
-  xlab("Day of exposure to *A. monospora*") +
+  xlab(NULL) +
   theme_classic() +
   theme(
     axis.title.x = ggtext::element_markdown(),
@@ -1267,10 +948,11 @@ s3<-ggplot(metsch_survival_summary, aes(x = DayMetNum, y = mean_survival, shape 
         "ExposedUninfected" = "exposed to *P. ramosa* but uninfected",
         "Unexposed" = "unexposed to *P. ramosa*")) + geom_hline(yintercept = 60.36782, linetype = "dashed", color = "gray40")
 
+
 coinf_survival_summary <- clean_survival_summary %>%
   filter(InfStatusFactor == "Coinf")
 
-s4<-ggplot(coinf_survival_summary, aes(x = DayMetNum, y = mean_survival)) +
+s3<-ggplot(coinf_survival_summary, aes(x = DayMetNum, y = mean_survival)) +
   geom_point(size = 4, position = position_dodge(width = 0.4), color = "#7f39d4") +
   geom_errorbar(aes(ymin = mean_survival - se_survival, ymax = mean_survival + se_survival), 
                 width = 0.1, position = position_dodge(width = 0.4), color = "#7f39d4") +
@@ -1292,82 +974,9 @@ s4<-ggplot(coinf_survival_summary, aes(x = DayMetNum, y = mean_survival)) +
   scale_y_continuous(labels = scales::label_comma(), limits = c(0,80)) +
  theme(plot.title = element_text(hjust = 0.5)) + geom_hline(yintercept = 60.36782, linetype = "dashed", color = "gray40")
 
-survplot <- (s1 | s2) / (s3 | s4) +
-  plot_annotation(
-    tag_levels = "A"
-  ) &
-  theme(
-    text = element_text(size = 18),
-    axis.title = element_text(size = 18),
-    axis.text = element_text(size = 16),
-    legend.text = ggtext::element_markdown(size = 14),
-    legend.title = ggtext::element_markdown(size = 14),
-    strip.text = element_text(size = 18)
-  )
-survplot
-# ggsave("figures/survplot_test.png", survplot, dpi = 600, width = 15, height = 12, units = "in")
 
 
-s2v2<-ggplot(past_survival_summary, aes(x = DayMetNum, y = mean_survival, shape = MetExpStatus)) +
-  geom_point(size = 4, position = position_dodge(width = 0.4), color = "cornflowerblue") +
-  geom_errorbar(aes(ymin = mean_survival - se_survival, ymax = mean_survival + se_survival), 
-                width = 0.1, position = position_dodge(width = 0.4), color = "cornflowerblue") +
-  ylab("Host lifespan (days)") +
-  xlab(NULL) +
-  theme_classic() +
-  theme(
-    axis.title.x = ggtext::element_markdown(),
-    axis.title.y = ggtext::element_markdown(),
-    legend.text = ggtext::element_markdown(),
-    legend.title = ggtext::element_markdown(),
-    plot.title = ggtext::element_markdown(hjust = 0.5),
-    legend.position = "none",
-    legend.justification = c("left", "top"),
-    legend.background = element_rect(fill = "white", color = "black", linewidth = 0.3)
-  ) +
-  labs(
-    shape = NULL,
-    title = "*P. ramosa*" 
-  ) +
-  scale_y_continuous(labels = scales::label_comma(), limits = c(0,80)) +
-  scale_shape_manual(
-    values = c(
-      "ExposedUninfected" = 16,
-      "Unexposed" = 15), labels = c(
-        "ExposedUninfected" = "exposed but uninfected",
-        "Unexposed" = "unexposed")) + geom_hline(yintercept = 60.36782, linetype = "dashed", color = "gray40")
-
-s3v2<-ggplot(metsch_survival_summary, aes(x = DayMetNum, y = mean_survival, shape = PastExpStatus)) +
-  geom_point(size = 4, position = position_dodge(width = 1.25), color = "tomato") +
-  geom_errorbar(aes(ymin = mean_survival - se_survival, ymax = mean_survival + se_survival), 
-                width = 0.1, position = position_dodge(width = 1.25), color = "tomato") +
-  ylab("Host lifespan (days)") +
-  xlab(NULL) +
-  theme_classic() +
-  theme(
-    axis.title.x = ggtext::element_markdown(),
-    axis.title.y = ggtext::element_markdown(),
-    legend.text = ggtext::element_markdown(),
-    legend.title = ggtext::element_markdown(),
-    plot.title = ggtext::element_markdown(hjust = 0.5),
-    legend.position = c(.01,1),
-    legend.justification = c("left", "top"),
-    legend.background = element_rect(fill = "white", color = "black", linewidth = 0.3)
-  ) +
-  labs(
-    shape = NULL,
-    title = "*A. monospora*"   
-  ) +
-  scale_y_continuous(labels = scales::label_comma(), limits = c(0,80)) +
-  scale_shape_manual(
-    values = c(
-      "ExposedUninfected" = 16,
-      "Unexposed" = 15), labels = c(
-        "ExposedUninfected" = "exposed to *P. ramosa* but uninfected",
-        "Unexposed" = "unexposed to *P. ramosa*")) + geom_hline(yintercept = 60.36782, linetype = "dashed", color = "gray40")
-
-
-comboplot <- (e2v3 | s2v2) / (e3v3 | s3v2 ) / (e4v3 | s4) +
+comboplot <- (e1 | s1) / (e2 | s2 ) / (e3 | s3) +
   plot_annotation(
     tag_levels = "A"
   ) &
@@ -1444,15 +1053,6 @@ lifespan.glm_simResid <- simulateResiduals(fittedModel = lifespan.glm)
 plot(lifespan.glm_simResid)  # looks wonky
 
 # Will look at just each panel of the figure for a separate analysis
-# all Metsch-infected hosts
-
-el.final.met <- el.final %>%
-  subset(MetschInfected == "Yes")
-
-lifespan.glm.met <- glmmTMB(lifesurvival ~ InfStatusFactor * DayMetNum, family = gaussian, data = el.final.met)
-summary(totalegg.glm.met)
-
-# Marginally significant interaction -- different responses of singly vs. coinfected ones based on day of Metsch addition
 
 # just singly Metsch infected:
 el.final.singlemet <- el.final %>%

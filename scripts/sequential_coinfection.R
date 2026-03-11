@@ -173,7 +173,7 @@ prevalence_combined$Coinfected <- factor(
   labels = c("single infection", "coinfection", "total"))
 
 #Making this facet plot by stacked with coinfected vs singly infected 
-f1<-ggplot(prevalence_combined, aes(x = DayMetNum, y = prevalence, color = Coinfected)) +
+f1<-ggplot(prevalence_combined, aes(x = DayMetNum, y = prevalence, color = Coinfected, shape = Coinfected)) +
   geom_point(size = 4, position = position_dodge(width = 1.75)) +
   geom_errorbar(aes(ymin = prevalence - se, ymax = prevalence + se), 
                 width = 0.1, position = position_dodge(width = 1.75)) +
@@ -185,8 +185,22 @@ f1<-ggplot(prevalence_combined, aes(x = DayMetNum, y = prevalence, color = Coinf
     ), labels = c(
       "single infection" = "single infection",
       "coinfection" = "coinfection",
-      "total" = "total *P. ramosa* infection in coexposed treatments")) +
-  ylab("Infection prevalence of *P. ramosa*") +
+      "total" = "total *P. ramosa* infection"
+      )
+    ) +
+  scale_shape_manual(                                       
+    values = c(
+      "single infection" = 16,                             
+      "coinfection" = 17,                                   
+      "total" = 18                                          
+    ),
+    labels = c(                                             
+      "single infection" = "single infection",
+      "coinfection" = "coinfection",
+      "total" = "total *P. ramosa* infection"
+    )
+  ) +
+  ylab("*P. ramosa* infection prevalence") +
   xlab(NULL) +
   theme_classic() +
   theme(
@@ -196,8 +210,19 @@ f1<-ggplot(prevalence_combined, aes(x = DayMetNum, y = prevalence, color = Coinf
     legend.position = c(.01, 1),
     legend.justification = c("left", "top"),
     legend.background = element_rect(fill = "white", color = "black", linewidth = 0.3)
-  ) + labs(color = NULL) +
-  coord_cartesian(ylim = c(0, 1))
+  ) + 
+  labs(color = NULL, shape = NULL) +                        # Added shape = NULL to remove both legend titles
+  coord_cartesian(ylim = c(0, 1)) +
+  guides(
+    color = guide_legend(                                   # Added guides() to merge legends
+      title = NULL,
+      title.theme = ggtext::element_markdown()
+    ),
+    shape = guide_legend(
+      title = NULL,
+      title.theme = ggtext::element_markdown()
+    )
+  )
 
 # Spore count summary
 past_spores <- subset(past, PastInfected == "Yes")
@@ -219,7 +244,7 @@ past_spores_summary$Coinfected <- factor(
   labels = c("single infection", "coinfection"))
 
 #Past spores plotted 
-f2<-ggplot(past_spores_summary, aes(x = DayMetNum, y = mean_spores, color = Coinfected)) +
+f2<-ggplot(past_spores_summary, aes(x = DayMetNum, y = mean_spores, color = Coinfected, shape = Coinfected)) +
   geom_point(size = 4, position = position_dodge(width = 1.75)) +
   geom_errorbar(aes(ymin = mean_spores - se_spores, ymax = mean_spores + se_spores), 
                 width = 0.1, position = position_dodge(width = 1.75)) +
@@ -229,7 +254,17 @@ f2<-ggplot(past_spores_summary, aes(x = DayMetNum, y = mean_spores, color = Coin
       "coinfection" = "#7f39d4"), labels = c(
       "single infection" = "single infection",
       "coinfection" = "coinfection")) +
-  ylab("Mean *P. ramosa* spores per host") +
+  scale_shape_manual(                                       
+    values = c(
+      "single infection" = 16,                             # Circle
+      "coinfection" = 17                                   # Triangle
+    ),
+    labels = c(                                          
+      "single infection" = "single infection",
+      "coinfection" = "coinfection"
+    )
+  ) +
+  ylab("*P. ramosa* spores per host") +
   xlab(NULL) +
   theme_classic() +
   theme(
@@ -239,7 +274,17 @@ f2<-ggplot(past_spores_summary, aes(x = DayMetNum, y = mean_spores, color = Coin
     legend.position = c(.01, 1),
     legend.justification = c("left", "top"),
     legend.background = element_rect(fill = "white", color = "black", linewidth = 0.3)
-  ) + labs(color = NULL) + scale_y_continuous(labels = scales::label_comma()) + ylim(0, 900000)
+  ) + labs(color = NULL) + scale_y_continuous(labels = scales::label_comma()) + ylim(0, 900000) +
+  guides(
+    color = guide_legend(                               
+      title = NULL,
+      title.theme = ggtext::element_markdown()
+    ),
+    shape = guide_legend(
+      title = NULL,
+      title.theme = ggtext::element_markdown()
+    )
+  )
 
 
 #Same thing as the two plots above, but for metsch 
@@ -299,11 +344,15 @@ prevalence_combined_metsch_with_singly_exposed$PastExpStatus <- factor(
   levels = c("ExposedUninfected", "Unexposed", "Infected", "Summed"),
   labels = c("exposed but uninfected", "unexposed", "infected", "overall (only coexposed treatments)"))
 
-fig3_data <- prevalence_combined_metsch_with_singly_exposed %>%
-  filter(!(Coinfected == "single infection" & PastExpStatus == "exposed but uninfected"))
+fig3_data <- prevalence_combined_metsch_with_singly_exposed 
+
+# %>%
+#  filter(!(Coinfected == "single infection" & PastExpStatus == "exposed but uninfected"))
 
 fig3_data <- fig3_data %>%
   mutate(group = paste(Coinfected, PastExpStatus, sep = " | "))
+
+write.csv(fig3_data, file = "fig3_data.csv", row.names = FALSE)
 
 #Third plot for the facet plot
 f3<-ggplot(fig3_data, aes(x = DayMetNum, y = prevalence, color = group, shape = group)) +
@@ -312,11 +361,13 @@ f3<-ggplot(fig3_data, aes(x = DayMetNum, y = prevalence, color = group, shape = 
                 width = 0.1, position = position_dodge(width = 1.75)) +
   scale_color_manual(
     values = c(
+      "single infection | exposed but uninfected" = "tomato4",
       "single infection | unexposed" = "tomato",
       "coinfection | infected" = "#7f39d4",
       "total | overall (only coexposed treatments)" = "black"
     ),
     labels = c(
+      "single infection | exposed but uninfected" = "single infection, exposed to *P. ramosa*",
       "single infection | unexposed" = "single infection, never exposed to *P. ramosa*",
       "coinfection | infected" = "coinfection",
       "total | overall (only coexposed treatments)" = "total *A. monospora* infection in coexposed treatments"
@@ -324,18 +375,20 @@ f3<-ggplot(fig3_data, aes(x = DayMetNum, y = prevalence, color = group, shape = 
   ) +
   scale_shape_manual(
     values = c(
+      "single infection | exposed but uninfected" = 15,
       "single infection | unexposed" = 16,
       "coinfection | infected" = 17,
       "total | overall (only coexposed treatments)" = 18
     ),
     labels = c(
+      "single infection | exposed but uninfected" = "single infection, exposed to *P. ramosa*",
       "single infection | unexposed" = "single infection, never exposed to *P. ramosa*",
       "coinfection | infected" = "coinfection",
       "total | overall (only coexposed treatments)" = "total *A. monospora* infection in coexposed treatments"
     )
   ) +
-  ylab("Infection prevalence of *A. monospora*") +
-  xlab("Day of exposure to *A. monospora*") +
+  ylab("*A. monospora* infection prevalence") +
+  xlab("Day of *A. monospora* exposure") +
   theme_classic() +
   theme(
     axis.title.x = ggtext::element_markdown(),
@@ -346,17 +399,19 @@ f3<-ggplot(fig3_data, aes(x = DayMetNum, y = prevalence, color = group, shape = 
     legend.justification = c("left", "top"),
     legend.background = element_rect(fill = "white", color = "black", linewidth = 0.3)
   ) +
-  coord_cartesian(ylim = c(0, 1)) +
+  coord_cartesian(ylim = c(0, 0.99)) +
   guides(
     color = guide_legend(
       title = NULL,
-      title.theme = ggtext::element_markdown(),
-      override.aes = list(shape = c(17, 16, 18))
+      title.theme = ggtext::element_markdown()
     ),
-    shape = "none"
+    shape = guide_legend(
+      title = NULL,
+      title.theme = ggtext::element_markdown()
+    )
   )
 
-#fourth part of the facet plot
+# Metsch spore yield
 # Spore count summary
 metsch_spores <- subset(metsch_with_singlyexposed, MetschInfected == "Yes")
 
@@ -411,8 +466,8 @@ f4<-ggplot(fig4_data, aes(x = DayMetNum, y = mean_spores, color = group, shape =
       "single infection | Unexposed" = "single infected, never exposed to *P. ramosa*"
     )
   ) +
-  ylab("Mean *A. monospora* spores per host") +
-  xlab("Day of exposure to *A. monospora*") +
+  ylab("*A. monospora* spores per host") +
+  xlab("Day of *A. monospora* exposure") +
   theme_classic() +
   theme(
     axis.title.x = ggtext::element_markdown(),
